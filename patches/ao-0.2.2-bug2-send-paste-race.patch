@@ -1,0 +1,314 @@
+diff --git a/packages/plugins/runtime-tmux/src/__tests__/index.test.ts b/packages/plugins/runtime-tmux/src/__tests__/index.test.ts
+index b4f37b2b..a22d5ea7 100644
+--- a/packages/plugins/runtime-tmux/src/__tests__/index.test.ts
++++ b/packages/plugins/runtime-tmux/src/__tests__/index.test.ts
+@@ -314,7 +314,8 @@ describe("runtime.sendMessage()", () => {
+     mockTmuxSuccess();
+     mockTmuxSuccess();
+ 
+-    await runtime.sendMessage(handle, "hello world");
++    const sendPromise = runtime.sendMessage(handle, "hello world");
++    await sendPromise;
+ 
+     expect(mockExecFileCustom).toHaveBeenCalledTimes(3);
+ 
+@@ -348,17 +349,21 @@ describe("runtime.sendMessage()", () => {
+     const handle = makeHandle("msg-long");
+     const longText = "x".repeat(250);
+ 
+-    // 1: C-u, 2: load-buffer, 3: paste-buffer, 4: unlinkSync (sync), 5: delete-buffer, 6: Enter
++    const draftPane = `[Pasted Content ${longText.length} chars]`;
++    const processingPane = "Working";
++
+     mockTmuxSuccess(); // C-u
+     mockTmuxSuccess(); // load-buffer
+     mockTmuxSuccess(); // paste-buffer
+     mockTmuxSuccess(); // delete-buffer (finally block)
++    mockTmuxSuccess(draftPane); // settle snapshot
++    mockTmuxSuccess(draftPane); // settle stable #1
++    mockTmuxSuccess(draftPane); // settle stable #2
+     mockTmuxSuccess(); // Enter
++    mockTmuxSuccess(processingPane); // capture after Enter
+ 
+     await runtime.sendMessage(handle, longText);
+ 
+-    expect(mockExecFileCustom).toHaveBeenCalledTimes(5);
+-
+     // Call 0: clear
+     expect(mockExecFileCustom).toHaveBeenNthCalledWith(
+       1,
+@@ -388,6 +393,18 @@ describe("runtime.sendMessage()", () => {
+       expectedTmuxOptions,
+     );
+ 
++    expect(mockExecFileCustom).toHaveBeenCalledWith(
++      "tmux",
++      ["capture-pane", "-t", "msg-long", "-p", "-S", "-40"],
++      expectedTmuxOptions,
++    );
++
++    expect(mockExecFileCustom).toHaveBeenCalledWith(
++      "tmux",
++      ["send-keys", "-t", "msg-long", "Enter"],
++      expectedTmuxOptions,
++    );
++
+     // Verify writeFileSync was called with the message
+     expect(fs.writeFileSync).toHaveBeenCalledWith(
+       expect.stringContaining("ao-send-test-uuid-1234.txt"),
+@@ -404,14 +421,21 @@ describe("runtime.sendMessage()", () => {
+   it("uses load-buffer for multiline text", async () => {
+     const runtime = create();
+     const handle = makeHandle("msg-multi");
++    const message = "check C:\\\\Users\\\\me\\\\repo\\\\file.ts\nthen continue";
++    const draftPane = "[Pasted Content 48 chars]";
++    const processingPane = "Working";
+ 
+     mockTmuxSuccess(); // C-u
+     mockTmuxSuccess(); // load-buffer
+     mockTmuxSuccess(); // paste-buffer
+     mockTmuxSuccess(); // delete-buffer (finally)
++    mockTmuxSuccess(draftPane); // settle snapshot
++    mockTmuxSuccess(draftPane); // settle stable #1
++    mockTmuxSuccess(draftPane); // settle stable #2
+     mockTmuxSuccess(); // Enter
++    mockTmuxSuccess(processingPane); // capture after Enter
+ 
+-    await runtime.sendMessage(handle, "line1\nline2\nline3");
++    await runtime.sendMessage(handle, message);
+ 
+     // Should use buffer path, not send-keys -l
+     expect(mockExecFileCustom).toHaveBeenNthCalledWith(
+@@ -428,7 +452,7 @@ describe("runtime.sendMessage()", () => {
+ 
+     expect(fs.writeFileSync).toHaveBeenCalledWith(
+       expect.stringContaining("ao-send-test-uuid-1234.txt"),
+-      "line1\nline2\nline3",
++      message,
+       { encoding: "utf-8", mode: 0o600 },
+     );
+   });
+@@ -446,7 +470,8 @@ describe("runtime.sendMessage()", () => {
+     mockTmuxSuccess(); // delete-buffer in finally
+     // After finally, the error propagates — no Enter call
+ 
+-    await expect(runtime.sendMessage(handle, longText)).rejects.toThrow("paste-buffer failed");
++    const sendPromise = runtime.sendMessage(handle, longText);
++    await expect(sendPromise).rejects.toThrow("paste-buffer failed");
+ 
+     // unlinkSync should still be called for temp file cleanup
+     expect(fs.unlinkSync).toHaveBeenCalledWith(
+@@ -460,6 +485,60 @@ describe("runtime.sendMessage()", () => {
+       expectedTmuxOptions,
+     );
+   });
++
++  it("retries Enter when the pasted draft is still visible after the first submit attempt", async () => {
++    const runtime = create();
++    const handle = makeHandle("msg-retry");
++    const message = "line1\nline2\nline3";
++    const draftPane = "[Pasted Content 17 chars]";
++    const processingPane = "Working";
++
++    mockTmuxSuccess(); // C-u
++    mockTmuxSuccess(); // load-buffer
++    mockTmuxSuccess(); // paste-buffer
++    mockTmuxSuccess(); // delete-buffer
++    mockTmuxSuccess(draftPane); // settle snapshot
++    mockTmuxSuccess(draftPane); // settle stable #1
++    mockTmuxSuccess(draftPane); // settle stable #2
++    mockTmuxSuccess(); // Enter #1
++    mockTmuxSuccess(draftPane); // capture after Enter #1 -> still draft
++    mockTmuxSuccess(); // Enter #2
++    mockTmuxSuccess(processingPane); // capture after Enter #2 -> submitted
++
++    await runtime.sendMessage(handle, message);
++
++    const enterCalls = mockExecFileCustom.mock.calls.filter(
++      (call) => call[1][0] === "send-keys" && call[1][call[1].length - 1] === "Enter",
++    );
++    expect(enterCalls).toHaveLength(2);
++  });
++
++  it("throws when the pasted draft is still visible after all Enter retries", async () => {
++    const runtime = create();
++    const handle = makeHandle("msg-stuck");
++    const message = "line1\nline2\nline3";
++    const draftPane = "[Pasted Content 17 chars]";
++
++    mockTmuxSuccess(); // C-u
++    mockTmuxSuccess(); // load-buffer
++    mockTmuxSuccess(); // paste-buffer
++    mockTmuxSuccess(); // delete-buffer
++    mockTmuxSuccess(draftPane); // settle snapshot
++    mockTmuxSuccess(draftPane); // settle stable #1
++    mockTmuxSuccess(draftPane); // settle stable #2
++    mockTmuxSuccess(); // Enter #1
++    mockTmuxSuccess(draftPane); // capture after Enter #1
++    mockTmuxSuccess(); // Enter #2
++    mockTmuxSuccess(draftPane); // capture after Enter #2
++    mockTmuxSuccess(); // Enter #3
++    mockTmuxSuccess(draftPane); // capture after Enter #3
++    mockTmuxSuccess(); // Enter #4
++    mockTmuxSuccess(draftPane); // capture after Enter #4
++
++    await expect(runtime.sendMessage(handle, message)).rejects.toThrow(
++      "tmux pasted message but could not confirm submission",
++    );
++  }, 10000);
+ });
+ 
+ describe("runtime.getOutput()", () => {
+diff --git a/packages/plugins/runtime-tmux/src/index.ts b/packages/plugins/runtime-tmux/src/index.ts
+index 96021d1e..2ce3ccd8 100644
+--- a/packages/plugins/runtime-tmux/src/index.ts
++++ b/packages/plugins/runtime-tmux/src/index.ts
+@@ -17,6 +17,11 @@ import {
+ 
+ const execFileAsync = promisify(execFile);
+ const TMUX_COMMAND_TIMEOUT_MS = 5_000;
++const PASTE_BUFFER_THRESHOLD = 200;
++const CAPTURE_LINES = 40;
++const CAPTURE_POLL_MS = 250;
++const PASTE_SETTLE_STABLE_POLLS = 2;
++const ENTER_RETRY_DELAYS_MS = [500, 1000, 1500, 2500] as const;
+ 
+ export const manifest = {
+   name: "tmux",
+@@ -49,6 +54,88 @@ async function tmux(...args: string[]): Promise<string> {
+   return stdout.trimEnd();
+ }
+ 
++function lastNonEmptyLine(output: string): string {
++  const lines = output.split("\n");
++  for (let i = lines.length - 1; i >= 0; i--) {
++    const line = lines[i]?.trim();
++    if (line) return line;
++  }
++  return "";
++}
++
++function isPromptLine(line: string): boolean {
++  return /^[>$#\u276f\u203a]\s*$/u.test(line);
++}
++
++function hasPastedDraftMarker(output: string): boolean {
++  return /\[Pasted Content \d+ chars\](?:\s*#\d+)?/.test(output);
++}
++
++function likelyHasDraftInput(output: string, message: string): boolean {
++  if (!output) return false;
++  if (hasPastedDraftMarker(output)) return true;
++
++  const candidates = new Set<string>();
++  const messageTail = message.slice(-Math.min(120, message.length)).trim();
++  if (messageTail.length >= 8) candidates.add(messageTail);
++
++  const trailingLines = message
++    .split(/\r?\n/)
++    .map((line) => line.trim())
++    .filter(Boolean)
++    .slice(-2);
++  for (const line of trailingLines) {
++    const tail = line.slice(-Math.min(80, line.length)).trim();
++    if (tail.length >= 8) candidates.add(tail);
++  }
++
++  return [...candidates].some((candidate) => output.includes(candidate));
++}
++
++async function capturePane(sessionName: string, lines = CAPTURE_LINES): Promise<string> {
++  try {
++    return await tmux("capture-pane", "-t", sessionName, "-p", "-S", `-${lines}`);
++  } catch {
++    return "";
++  }
++}
++
++async function waitForPasteToSettle(sessionName: string, messageLength: number): Promise<string> {
++  const settleBudgetMs = Math.min(10_000, 1_500 + Math.ceil(messageLength / 1000) * 600);
++  let snapshot = await capturePane(sessionName);
++  let stablePolls = 0;
++  const deadline = Date.now() + settleBudgetMs;
++
++  while (Date.now() < deadline) {
++    await sleep(CAPTURE_POLL_MS);
++    const next = await capturePane(sessionName);
++    if (next === snapshot) {
++      stablePolls += 1;
++      if (stablePolls >= PASTE_SETTLE_STABLE_POLLS) return next;
++    } else {
++      stablePolls = 0;
++      snapshot = next;
++    }
++  }
++
++  return snapshot;
++}
++
++function hasSubmissionStarted(opts: { before: string; after: string; message: string }): boolean {
++  const { before, after, message } = opts;
++  if (!after || after === before) return false;
++
++  const beforeHasDraft = likelyHasDraftInput(before, message);
++  const afterHasDraft = likelyHasDraftInput(after, message);
++  if (beforeHasDraft && !afterHasDraft) return true;
++
++  const beforePrompt = isPromptLine(lastNonEmptyLine(before));
++  const afterPrompt = isPromptLine(lastNonEmptyLine(after));
++  if (beforePrompt && !afterPrompt) return true;
++
++  return false;
++}
++
+ export function create(): Runtime {
+   return {
+     name: "tmux",
+@@ -114,7 +201,9 @@ export function create(): Runtime {
+ 
+       // For long or multiline messages, use load-buffer + paste-buffer
+       // Use randomUUID to avoid temp file collisions on concurrent sends
+-      if (message.includes("\n") || message.length > 200) {
++      const usesPasteBuffer =
++        message.includes("\n") || message.length > PASTE_BUFFER_THRESHOLD;
++      if (usesPasteBuffer) {
+         const bufferName = `ao-${randomUUID()}`;
+         const tmpPath = join(tmpdir(), `ao-send-${randomUUID()}.txt`);
+         writeFileSync(tmpPath, message, { encoding: "utf-8", mode: 0o600 });
+@@ -139,12 +228,32 @@ export function create(): Runtime {
+         // Use -l (literal) so text like "Enter" or "Space" isn't interpreted
+         // as tmux key names
+         await tmux("send-keys", "-t", handle.id, "-l", message);
++        await tmux("send-keys", "-t", handle.id, "Enter");
++        return;
++      }
++
++      let baselinePane = await waitForPasteToSettle(handle.id, message.length);
++      if (!baselinePane) {
++        await tmux("send-keys", "-t", handle.id, "Enter");
++        return;
+       }
+ 
+-      // Small delay to let tmux process the pasted text before pressing Enter.
+-      // Without this, Enter can arrive before the text is fully rendered.
+-      await sleep(300);
+-      await tmux("send-keys", "-t", handle.id, "Enter");
++      let latestPane = baselinePane;
++      for (const retryDelayMs of ENTER_RETRY_DELAYS_MS) {
++        await tmux("send-keys", "-t", handle.id, "Enter");
++        await sleep(retryDelayMs);
++
++        latestPane = await capturePane(handle.id);
++        if (!latestPane) return;
++        if (hasSubmissionStarted({ before: baselinePane, after: latestPane, message })) return;
++        baselinePane = latestPane;
++      }
++
++      if (likelyHasDraftInput(latestPane, message)) {
++        throw new Error(
++          `tmux pasted message but could not confirm submission after ${ENTER_RETRY_DELAYS_MS.length} Enter attempts`,
++        );
++      }
+     },
+ 
+     async getOutput(handle: RuntimeHandle, lines = 50): Promise<string> {
