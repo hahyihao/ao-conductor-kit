@@ -1,0 +1,175 @@
+diff --git a/packages/cli/__tests__/commands/status.test.ts b/packages/cli/__tests__/commands/status.test.ts
+index 6724b9b5..453bf50c 100644
+--- a/packages/cli/__tests__/commands/status.test.ts
++++ b/packages/cli/__tests__/commands/status.test.ts
+@@ -412,6 +412,42 @@ describe("status command", () => {
+     expect(output).toContain("live-branch");
+   });
+ 
++  it("uses the live branch for detectPR when metadata branch is stale", async () => {
++    writeFileSync(
++      join(sessionsDir, "app-1"),
++      "worktree=/tmp/wt\nbranch=old-branch\nstatus=working\n",
++    );
++
++    mockTmux.mockImplementation(async (...args: string[]) => {
++      if (args[0] === "list-sessions") return "app-1";
++      if (args[0] === "display-message") return null;
++      return null;
++    });
++    mockGit.mockResolvedValue("live-branch");
++    mockDetectPR.mockImplementation(async (session: Session) => {
++      if (session.branch !== "live-branch") return null;
++      return {
++        number: 42,
++        url: "https://github.com/org/repo/pull/42",
++        title: "Live PR",
++        owner: "org",
++        repo: "repo",
++        branch: "live-branch",
++        baseBranch: "main",
++        isDraft: false,
++      };
++    });
++
++    await program.parseAsync(["node", "test", "status"]);
++
++    expect(mockDetectPR).toHaveBeenCalledWith(
++      expect.objectContaining({ branch: "live-branch" }),
++      expect.anything(),
++    );
++    const output = consoleSpy.mock.calls.map((c) => c[0]).join("\n");
++    expect(output).toContain("#42");
++  });
++
+   it("shows table header with column names", async () => {
+     writeFileSync(join(sessionsDir, "app-1"), "branch=main\nstatus=idle\n");
+ 
+diff --git a/packages/cli/src/commands/status.ts b/packages/cli/src/commands/status.ts
+index fa905c9d..71e0dc9f 100644
+--- a/packages/cli/src/commands/status.ts
++++ b/packages/cli/src/commands/status.ts
+@@ -126,7 +126,8 @@ async function gatherSessionInfo(
+     try {
+       const project = projectConfig.projects[session.projectId];
+       if (project) {
+-        const prInfo: PRInfo | null = await scm.detectPR(session, project);
++        const scmSession = branch !== session.branch ? { ...session, branch } : session;
++        const prInfo: PRInfo | null = await scm.detectPR(scmSession, project);
+         if (prInfo) {
+           prNumber = prInfo.number;
+ 
+diff --git a/packages/core/src/__tests__/lifecycle-manager.test.ts b/packages/core/src/__tests__/lifecycle-manager.test.ts
+index 1298d9ed..a7dfe731 100644
+--- a/packages/core/src/__tests__/lifecycle-manager.test.ts
++++ b/packages/core/src/__tests__/lifecycle-manager.test.ts
+@@ -1,3 +1,6 @@
++import * as childProcess from "node:child_process";
++import { mkdirSync } from "node:fs";
++import { join } from "node:path";
+ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+ import { createLifecycleManager } from "../lifecycle-manager.js";
+ import { createSessionManager } from "../session-manager.js";
+@@ -289,6 +292,51 @@ describe("check (single session)", () => {
+     expect(lm.getStates().get("app-1")).toBe("stuck");
+   });
+ 
++  it("uses the live worktree branch for PR autodetect and self-heals branch metadata", async () => {
++    const pr = makePR({ branch: "feat/live" });
++    const mockSCM = createMockSCM({ detectPR: vi.fn().mockResolvedValue(pr) });
++    const registry = createMockRegistry({
++      runtime: plugins.runtime,
++      agent: plugins.agent,
++      scm: mockSCM,
++    });
++    const workspacePath = join(env.tmpDir, "live-branch-repo");
++    mkdirSync(workspacePath, { recursive: true });
++    childProcess.execFileSync("git", ["init"], {
++      cwd: workspacePath,
++      stdio: "ignore",
++    });
++    childProcess.execFileSync("git", ["checkout", "-b", "feat/live"], {
++      cwd: workspacePath,
++      stdio: "ignore",
++    });
++
++    const session = makeSession({
++      status: "working",
++      branch: "feat/stale",
++      pr: null,
++      workspacePath,
++      metadata: { agent: "mock-agent" },
++    });
++
++    const lm = setupCheck("app-1", {
++      session,
++      metaOverrides: { branch: "feat/stale", agent: "mock-agent" },
++      registry,
++    });
++
++    await lm.check("app-1");
++
++    expect(mockSCM.detectPR).toHaveBeenCalledWith(
++      expect.objectContaining({ branch: "feat/live" }),
++      expect.anything(),
++    );
++    const meta = readMetadataRaw(env.sessionsDir, "app-1");
++    expect(meta?.["branch"]).toBe("feat/live");
++    expect(meta?.["pr"]).toBe(pr.url);
++    expect(lm.getStates().get("app-1")).toBe("pr_open");
++  });
++
+   it("preserves stuck state when getActivityState throws", async () => {
+     vi.mocked(plugins.agent.getActivityState).mockRejectedValue(new Error("probe failed"));
+ 
+diff --git a/packages/core/src/lifecycle-manager.ts b/packages/core/src/lifecycle-manager.ts
+index 613d8615..f747e760 100644
+--- a/packages/core/src/lifecycle-manager.ts
++++ b/packages/core/src/lifecycle-manager.ts
+@@ -10,6 +10,7 @@
+  * Reference: scripts/claude-session-status, scripts/claude-review-check
+  */
+ 
++import { execFileSync } from "node:child_process";
+ import { randomUUID } from "node:crypto";
+ import {
+   SESSION_STATUS,
+@@ -177,6 +178,19 @@ function transitionLogLevel(status: SessionStatus): "info" | "warn" | "error" {
+   return "info";
+ }
+ 
++function getLiveWorktreeBranch(worktreePath: string): string | null {
++  try {
++    const branch = execFileSync("git", ["branch", "--show-current"], {
++      cwd: worktreePath,
++      encoding: "utf8",
++      timeout: 5000,
++    }).trim();
++    return branch || null;
++  } catch {
++    return null;
++  }
++}
++
+ export interface LifecycleManagerDeps {
+   config: OrchestratorConfig;
+   registry: PluginRegistry;
+@@ -459,7 +473,17 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+       !session.id.endsWith("-orchestrator")
+     ) {
+       try {
+-        const detectedPR = await scm.detectPR(session, project);
++        let scmSession: Session = session;
++        const liveBranch =
++          session.workspacePath ? getLiveWorktreeBranch(session.workspacePath) : null;
++        if (liveBranch && liveBranch !== session.branch) {
++          scmSession = { ...session, branch: liveBranch };
++          const sessionsDir = getSessionsDir(config.configPath, project.path);
++          updateMetadata(sessionsDir, session.id, { branch: liveBranch });
++          session.branch = liveBranch;
++        }
++
++        const detectedPR = await scm.detectPR(scmSession, project);
+         if (detectedPR) {
+           session.pr = detectedPR;
+           // Persist PR URL so subsequent polls don't need to re-query.
