@@ -553,19 +553,24 @@ fatal: 'feat/issue-4' is already checked out at '/root/.worktrees/ao-kit/kit-7'
 
 ### 修复
 
-清理前一次的 worktree，再让 git 清理自己的记账：
+优先直接跑仓库自带的清理脚本。它会按 session 名自动处理 `ao session kill`、删除对应的 stale worktree 目录，并补一遍 `git worktree prune`：
 
 ```bash
 cd /root/projects/<your-project>
+tools/ao-session-purge.sh kit3-7
+git worktree list      # 不应再看到 /root/.worktrees/<project-slug>/kit3-7
+```
 
-# 1. 物理清理 worktree 目录（注意别在路径里犯变量为空的错）
-rm -rf /root/.worktrees/<project-slug>/kit-*
+这个脚本专门处理 Issue 12 的坑：
 
-# 2. 让 git 同步它的 worktree 索引
-git worktree prune
-git worktree list      # 应该只剩主 worktree
+- 如果 session 还在 AO 里，会先跑 `ao session kill <name>`
+- 如果 session 已经不存在，会打印跳过信息，不把"已清理"当错误
+- 会自动找到并删除 `/root/.worktrees/<project-slug>/<session-name>` 对应目录
+- 最后统一跑 `git worktree prune`
 
-# 3. 删除残留的 feature 分支（可选但推荐）
+如果你还想顺手删除残留的 feature 分支，可以额外执行：
+
+```bash
 git branch --list 'feat/*' | xargs -r git branch -D
 ```
 
@@ -573,8 +578,8 @@ git branch --list 'feat/*' | xargs -r git branch -D
 
 ### 预防
 
-1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次上面的清理流程。
-2. 在母盘里提供一个 `tools/prune-worktrees.sh` 脚本，把清理步骤固化下来。
+1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次 `tools/ao-session-purge.sh <session-name>`。
+2. 把 `tools/ao-session-purge.sh` 当成固定动作，而不是再手写 `rm -rf ... && git worktree prune`。
 3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
 4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
 
