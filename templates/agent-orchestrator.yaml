@@ -1,0 +1,36 @@
+# agent-orchestrator.yaml template
+# Copy this file to the root of any project you want AO to manage, then edit:
+#   1. projects.<key>.name     — human-readable project name
+#   2. projects.<key>.repo     — GitHub owner/repo (required for batch-spawn)
+#   3. projects.<key>.path     — absolute path to the repo inside WSL
+#   4. projects.<key>.defaultBranch
+#   5. projects.<key>.sessionPrefix
+# Then run:  ao start
+
+port: 3000
+
+defaults:
+  # runtime: tmux is REQUIRED for the orchestrator to stay alive between turns.
+  # runtime: process will cause the orchestrator session to die after the first response.
+  runtime: tmux
+
+  orchestrator:
+    # Use claude-code if you want a smart planner for complex tasks.
+    # Use codex for simpler/cheaper dispatching.
+    agent: codex
+
+  worker:
+    # codex is the default worker. You can override per-task with `ao spawn --agent`.
+    agent: codex
+
+  workspace: worktree
+
+  notifiers: []
+
+projects:
+  my-project:
+    name: My Project
+    repo: your-github-user/your-repo
+    path: /root/projects/my-project
+    defaultBranch: main
+    sessionPrefix: myproj

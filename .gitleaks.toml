@@ -1,0 +1,18 @@
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for documentation-only placeholder tokens"
+paths = [
+  '''briefs/.*\.md''',
+  '''TROUBLESHOOTING\.md''',
+  '''INSTALL\.md''',
+  '''README\.md''',
+]
+regexes = [
+  '''sk-your-key-here''',
+  '''ghp_your_token_here''',
+  '''ghp_xxxx.*''',
+]

@@ -1,0 +1,6 @@
+wsl_update_x64.msi
+.omc/
+ci-staging/
+*.log
+.DS_Store
+Thumbs.db
