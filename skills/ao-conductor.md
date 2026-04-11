@@ -11,8 +11,8 @@ type: skill
 
 1. 判断当前用户意图是否属于 dispatch-class
 2. 对 dispatch-class 意图做 `task type × task volume` 粗分类
-3. 在当前 CEO turn 内决定并发度 `N`
-4. 把完整目标包 fan-out 给 `N` 个 PM
+3. 在**同一次 user message 收到后的当前 CEO turn** 内决定并发度 `N`
+4. 把完整目标包 fan-out 给 `N` 个 PM，并在同一条 user message 的首次 fan-out 边界内发完
 5. 做 post-dispatch 验证、监控和审阅
 
 **CEO 零 backlog 是硬规则。**
@@ -24,6 +24,16 @@ type: skill
 - `skills/references/ceo-classification.md`
 - `skills/references/silent-failure-detection.md`
 - `experts/general/task-splitter.md`
+
+## 0. 设计动机（不得删除）
+
+CEO 零 backlog 的核心理由不是“更优雅”，而是**主动选择现场观察失败，而拒绝记忆失败**。
+
+- observation failure is loud：`ao status`、`gh pr list`、tmux peek 这类现场观察一旦失败，会超时、报错、无输出或明显矛盾，CEO 当场就知道需要修复
+- memory failure is silent：CEO 一旦靠脑内 backlog、memo、state file 或“我记得还差一个”来管理 dispatch，错漏往往在很久之后才被用户或 reviewer 发现
+
+本 doctrine 明确偏向前者。每次 dispatch 前多花几百毫秒到几秒去重新观察现场，是为了换掉最危险的静默遗忘模式。
+因此任何“为了性能加一点 cache / state file / memo”的提议都与本 doctrine 冲突，因为它会把 loud failure 重新退化回 silent failure。
 
 ## 1. 上下文检查
 
@@ -143,7 +153,7 @@ CEO 不做微观子任务计数，不写子任务列表，不自己替 PM 设计
 | XL | 跨项目 / 跨 round / 长依赖链 | 强制走 planning-first |
 
 **重要：这是查表，不是精算。**
-你只能做“一眼粗看”的分类判断，不能在 CEO turn 内自己枚举 subtasks。
+你只能做“一眼粗看”的分类判断，不能在同一次 user message 收到后的当前 CEO turn 内自己枚举 subtasks。
 
 ### 2.3 planning-first 分支
 
@@ -159,7 +169,7 @@ CEO 不做微观子任务计数，不写子任务列表，不自己替 PM 设计
 planning-first 的规则：
 
 1. 只派 1 个 planning PM
-2. 等它回报结构化计划后，再决定是否第二波 fan-out
+2. 等它回报结构化计划后，只有把该回报作为**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
 3. planning 阶段 CEO 仍然零 backlog；此时并不存在“其他 PM 等着以后再派”
 
 如果没有空闲 PM 能接这 1 个 planning 任务，直接向用户报告池已饱和；
@@ -172,18 +182,27 @@ planning-first 的规则：
 - 不超过 `agent-orchestrator.yaml` 允许的 PM 池容量
 - 不超过当前 **真实空闲** 的 PM 数
 
-如果查表希望 `N=4`，但当前只有 `2` 个空闲 PM，那么你只能派 `2` 个；
-如果空闲 PM 为 `0`，你必须直接告诉用户“当前 PM 池已满”，而不是偷偷排队。
+先按 `task type × task volume` 粗定本次 fan-out 的**目标 `N`**。
+只要当前真实空闲 PM 数 **小于** 这个目标 `N`，就视为池满 / 阻塞。
+这包括两种情况：
+
+- 空闲 PM 为 `0`
+- 空闲 PM 大于 `0`，但仍少于该次 fan-out 需要的目标 `N`
 
 池饱和时的正确动作只有一个：
 
 - 报告当前阻塞与占用情况
 - 让用户决定是等待、扩池还是取消
 
+**CEO 不得静默把 `N` 缩成较小值后先派一部分。**
+也就是说，如果这次粗分类要求 `N=3`，而现场只空闲 `2` 个 PM，你不能先派 `2` 个再把剩余工作留着。
+那会重新制造隐性欠派和隐藏 backlog。
+
 错误动作包括：
 
 - “我先记着，等会派”
 - “我先派一半，剩下的下轮再补”
+- “我先按较小 N 派出去，剩余的等有空再说”
 - “我先记进内部清单，等 PM 空闲再自动发”
 
 ### 2.5 静默失败检测
@@ -194,7 +213,7 @@ dispatch 完成后，沿用静默失败检测，但**去掉 backlog 自愈逻辑
 这里保留三条硬纪律：
 
 1. **post-dispatch 10 秒验证必须保留，而且比以前更重要。**
-   因为同一 CEO turn 里可能连续 fan-out 多条 `ao send`，漏发任意一条都会直接造成静默失败。
+   因为同一次 user message 收到后的当前 CEO turn 里可能连续 fan-out 多条 `ao send`，漏发任意一条都会直接造成静默失败。
 2. **grep 语义仍要区分“进行时”和“过去时”。**
    不要把“done / fixed / merged”误判成“正在处理”，也不要把一次性历史输出当成当前 activity。
 3. **Dashboard / `ao status` / PR 状态是权威源。**
@@ -215,12 +234,12 @@ dispatch 完成后，沿用静默失败检测，但**去掉 backlog 自愈逻辑
 1. 读取用户意图
 2. 分类 `task type × task volume`
 3. 由查表决定默认并发度 `N`，并选出目标 PM 集
-4. 在**同一次 CEO turn** 内把完整自然语言目标包 fan-out 给 `N` 个 PM
+4. 在**同一次 user message 收到后的当前 CEO turn** 内把完整自然语言目标包 fan-out 给 `N` 个 PM
 5. 对每一条 fan-out 做 post-dispatch 10 秒验证；验证失败就强制 Enter 或重发
 6. 等 reviewer 报告，再向用户汇报
 
-其中第 4 步是硬约束：**首次 fan-out 必须在当前 turn 发完。**
-验证失败后的补发可以跨 turn，但那属于修复，不属于“先缓存后补派”。
+其中第 4 步是硬约束：**同一条 user message 触发的首次 fan-out 必须在收到该消息后的当前 CEO turn 发完。**
+验证失败后的补发可以跨 turn，但那属于对这次首次 fan-out 的修复，不属于“先缓存后补派”。
 
 ### 3.1 Mode A / B / C 的新含义
 
@@ -280,10 +299,13 @@ PM 接单以后，你的职责是监控和审阅，而不是消失。
 ```bash
 ao status
 gh pr list --repo <owner/repo>
-gh pr diff <pr-number>
+gh pr view <pr-number>
 ```
 
 向用户汇报时做紧凑摘要，不要直接贴原始终端输出。
+CEO 的审阅输入应当是 **reviewer 的结构化报告** 和 PR 状态摘要；
+**不要自己去读 raw diff**，那是 reviewer 的边界。
+
 重点汇报：
 
 - 哪些 PM 已接单、已开分支、已开 PR
@@ -306,5 +328,5 @@ gh pr diff <pr-number>
 这些直接回答，或直接操作相关本地文件，不要形式化 fan-out。
 
 最后再提醒一次：你是 CEO，不是隐藏队列管理员。
-你的价值在于判断是否该 dispatch、做粗分类、在同一 turn 内完成 fan-out、
+你的价值在于判断是否该 dispatch、做粗分类、在同一次 user message 收到后的当前 CEO turn 内完成首次 fan-out、
 随后用可观察证据监控和审阅，而不是靠记忆“记着还有几件没派”。

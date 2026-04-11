@@ -4,6 +4,14 @@
 它只描述 **dispatch-class** 用户意图下 CEO 的分类方法，
 不授权 CEO 维护 backlog，也不授权 CEO 微观拆子任务。
 
+零 backlog 的设计动机同样适用于本文件：
+
+- observation failure is loud
+- memory failure is silent
+
+因此 CEO 应优先重新观察 `ao status`、`gh pr list` 和现场 pane，
+而不是靠记忆、memo 或缓存来维持 dispatch 状态。
+
 ## 1. 适用范围
 
 dispatch-class 意图示例：
@@ -51,7 +59,7 @@ dispatch-class 意图示例：
 - 看涉及模块的大致数量
 - 看依赖关系是否明显复杂
 
-**不要**在 CEO turn 内把 subtasks 数出来，再反推 volume。
+**不要**在同一次 user message 收到后的当前 CEO turn 内把 subtasks 数出来，再反推 volume。
 
 ## 4. planning-first 触发条件
 
@@ -67,8 +75,8 @@ dispatch-class 意图示例：
 planning-first 时：
 
 1. 先派 1 个 planning PM
-2. 等规划结果返回后，再决定是否进行第二波 fan-out
-3. 在 planning 返回前，不存在 CEO 内部“待派发”列表
+2. 等规划结果返回后，只有当该结果以**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
+3. 在 planning 返回前，不存在 CEO 内部“待派发”列表，也不存在“先记着，等下条 turn 再派”的缓存
 
 ## 5. PM 池上限与饱和处理
 
@@ -77,7 +85,10 @@ planning-first 时：
 - `agent-orchestrator.yaml` 定义的 PM 池容量
 - 当前真实空闲 PM 数
 
-如果空闲 PM 为 `0`，CEO 的动作是：
+先按分类粗定本次 fan-out 的目标 `N`。
+只要当前真实空闲 PM 数 **小于** 这个目标 `N`，不论差了多少，都按同一类池满 / 阻塞处理。
+
+如果真实空闲 PM 数小于目标 `N`，CEO 的动作是：
 
 1. 向用户说明池已饱和
 2. 报告当前占用情况
@@ -85,6 +96,7 @@ planning-first 时：
 
 CEO 不得：
 
+- 静默把 `N` 降成更小值后先派一部分
 - 记住未派任务，等 PM 空闲再自动发
 - 建隐藏 backlog / TODO / pending queue
-- 把当前用户消息拆到未来 turn，只为了缓存待派任务
+- 把当前 user message 的首次 fan-out 拆到未来 turn，只为了缓存待派任务

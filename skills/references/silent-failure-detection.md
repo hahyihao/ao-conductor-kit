@@ -4,6 +4,21 @@
 目标不是“自愈 CEO 手里的 backlog”，
 而是尽快发现 fan-out 丢失、会话无响应、状态误读和 dashboard 假象。
 
+## 0. 设计动机：为什么宁可重观察，也不靠记忆
+
+零 backlog doctrine 的根基是：
+
+- observation failure is loud
+- memory failure is silent
+
+如果 CEO 通过 `ao status`、`gh pr list`、tmux pane 重新观察现场，失败会表现为报错、超时、空白或状态矛盾；
+这类失败是可见的，可以立刻触发修复。
+
+如果 CEO 通过 backlog、memo、cache、state file 或“我记得还差一个 PM”来维持 dispatch 状态，
+失败通常是静默的，往往要到用户追问或 reviewer 指出时才暴露。
+
+因此本 doctrine 明确偏向反复重观察，且禁止任何把 dispatch 管理重新变成记忆问题的 cache / state file / memo 机制。
+
 ## 1. 零 backlog 下，检测目标变了
 
 旧模型会试图回答：
@@ -24,7 +39,7 @@ CEO 不持有 backlog，因此也没有 backlog 自愈。
 ## 2. Post-dispatch 10 秒验证必须保留
 
 每一条 fan-out 都必须在 dispatch 后约 10 秒做一次确认。
-这条规则在同 turn 连续 fan-out 多个 PM 时更重要，而不是更弱。
+这条规则在同一次 user message 收到后的当前 CEO turn 连续 fan-out 多个 PM 时更重要，而不是更弱。
 
 最低要求：
 
@@ -33,8 +48,8 @@ CEO 不持有 backlog，因此也没有 backlog 自愈。
 3. 确认目标 PM 出现新的进行时 activity、branch、PR 或上下文反应
 4. 如果没有，立即强制 Enter、重发或显式修复
 
-允许跨 turn 修复补发，
-但这属于 dispatch 修复，不是“先记住以后再派”。
+允许在首次 fan-out 之后跨 turn 修复补发，
+但这属于对同一条 user message 派发结果的修复，不是“先记住以后再派”。
 
 ## 3. P1：grep 语义必须区分进行时和过去时
 
