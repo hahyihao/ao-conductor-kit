@@ -21,6 +21,11 @@ FAIL=0
 pass() { printf '\033[1;32mok\033[0m   %s\n' "$1"; }
 fail() { printf '\033[1;31mfail\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 note() { printf '\033[0;37m       %s\033[0m\n' "$1"; }
+die_tmux() {
+  printf '\033[1;31mfail\033[0m %s\n' "$1"
+  note "See TROUBLESHOOTING.md Issue 11: TROUBLESHOOTING.md#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡"
+  exit 1
+}
 
 TMUX_MIN_VERSION=3.3
 
@@ -48,16 +53,13 @@ check_tmux_version() {
   normalized_version="$(normalize_tmux_version "$raw_version")"
 
   if [ -z "$normalized_version" ]; then
-    fail "tmux version could not be parsed from '$(tmux -V 2>/dev/null)'"
-    note "See TROUBLESHOOTING.md Issue 11 before using detached AO/Codex sessions."
-    return
+    die_tmux "tmux version could not be parsed from '$(tmux -V 2>/dev/null)'; detached AO/Codex sessions are blocked until tmux is 3.3+."
   fi
 
   if dpkg --compare-versions "$normalized_version" ge "$TMUX_MIN_VERSION"; then
     pass "tmux version ${raw_version} meets detached-session minimum (>= ${TMUX_MIN_VERSION})"
   else
-    fail "tmux version ${raw_version} is too old; Ubuntu 22.04 apt tmux is unsafe for detached AO/Codex sessions"
-    note "See TROUBLESHOOTING.md Issue 11 and rerun scripts/bootstrap-ao.sh until tmux -V reports ${TMUX_MIN_VERSION}+."
+    die_tmux "tmux version ${raw_version} is too old; Ubuntu 22.04 apt tmux 3.2a has a NULL-pointer segfault bug, so detached AO/Codex sessions are blocked until tmux is 3.3+."
   fi
 }
 

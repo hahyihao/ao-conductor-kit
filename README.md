@@ -58,9 +58,9 @@ wsl -d Ubuntu-22.04 bash /mnt/d/脚本程序/agent-orchestrator/scripts/verify-i
 
 > **重要警告（Ubuntu 22.04 tmux）**
 >
-> Ubuntu 22.04 apt 自带的 `tmux 3.2a` 对 AO / Codex 的 detached session **不安全**。在 `tmux + codex TUI + 文件操作` 负载下，它会触发 `TROUBLESHOOTING.md` Issue 11 记录的 segfault，导致 orchestrator / worker session 无故被杀掉。
+> Ubuntu 22.04 apt 自带的 `tmux 3.2a` 有一个 **NULL pointer segfault bug**，对 AO / Codex 的 detached session **不安全**。在 `tmux + codex TUI + 文件操作` 负载下，它会触发崩溃，导致 orchestrator / worker session 无故被杀掉。根因和复现证据见 [TROUBLESHOOTING.md Issue 11](TROUBLESHOOTING.md#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)。
 >
-> `scripts/bootstrap-ao.sh` 现在会在检测到 `tmux < 3.3` 时自动从源码升级到更高版本，并把 `/usr/bin/tmux` 指向 `/usr/local/bin/tmux`。跑完安装后，务必执行 `scripts/verify-install.sh`，确认 `tmux -V` 是 `3.3+` 再继续使用 AO。
+> `scripts/bootstrap-ao.sh` 现在会在检测到 `tmux < 3.3` 时自动从源码编译并安装 `tmux 3.5a`，然后把 `/usr/bin/tmux` 指向 `/usr/local/bin/tmux`。跑完安装后，务必执行 `scripts/verify-install.sh`，确认 `tmux -V` 是 `3.3+` 再继续使用 AO。
 
 ### 场景 B：为现有项目启用 AO
 
