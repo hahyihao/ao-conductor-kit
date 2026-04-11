@@ -153,8 +153,39 @@ function Remove-PortProxyRule {
     [void](Invoke-NativeCommand `
         -FilePath $NetshPath `
         -ArgumentList @('interface', 'portproxy', 'delete', 'v4tov4', "listenport=$ListenPort", "listenaddress=$ListenAddress") `
-        -Description "Removing portproxy rule $ListenAddress:$ListenPort")
-    Write-Warn "Removed stale portproxy rule $ListenAddress:$ListenPort."
+        -Description "Removing portproxy rule ${ListenAddress}:$ListenPort")
+    Write-Warn "Removed stale portproxy rule ${ListenAddress}:$ListenPort."
+}
+function Get-NormalizedFirewallProfiles {
+    param([AllowNull()][object]$Profile)
+    if ($null -eq $Profile) { return @() }
+
+    $profiles = @()
+    foreach ($entry in $Profile.ToString().Split(',')) {
+        $candidate = $entry.Trim()
+        if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+            $profiles += $candidate
+        }
+    }
+    if ($profiles -contains 'Any') {
+        return @('Any')
+    }
+    return @($profiles | Sort-Object -Unique)
+}
+function Test-FirewallProfileMatch {
+    param([AllowNull()][object]$ExistingProfile, [string]$DesiredProfile)
+
+    $normalizedExisting = @(Get-NormalizedFirewallProfiles -Profile $ExistingProfile)
+    $normalizedDesired = @(Get-NormalizedFirewallProfiles -Profile $DesiredProfile)
+    if ($normalizedExisting.Count -ne $normalizedDesired.Count) {
+        return $false
+    }
+    foreach ($profile in $normalizedDesired) {
+        if ($normalizedExisting -notcontains $profile) {
+            return $false
+        }
+    }
+    return $true
 }
 function Ensure-IpHelperService {
     try {
@@ -182,24 +213,26 @@ function Ensure-IpHelperService {
     Write-Success 'Windows IP Helper service is running.'
 }
 function Ensure-FirewallRule {
-    param([string]$DisplayName, [int]$LocalPort)
+    param([string]$DisplayName, [int]$LocalPort, [string]$Profile)
     $existingRules = @(Get-NetFirewallRule -DisplayName $DisplayName -ErrorAction SilentlyContinue)
     $recreateRule = $existingRules.Count -ne 1
     if (-not $recreateRule -and $existingRules.Count -eq 1) {
         $existingRule = $existingRules[0]
         $portFilter = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $existingRule | Select-Object -First 1
+        $profileMatches = Test-FirewallProfileMatch -ExistingProfile $existingRule.Profile -DesiredProfile $Profile
         if (
             $existingRule.Direction -ne 'Inbound' -or
             $existingRule.Action -ne 'Allow' -or
             $portFilter.Protocol -ne 'TCP' -or
-            $portFilter.LocalPort -ne "$LocalPort"
+            $portFilter.LocalPort -ne "$LocalPort" -or
+            -not $profileMatches
         ) {
             $recreateRule = $true
         }
     }
     if ($recreateRule -and $existingRules.Count -gt 0) {
         $existingRules | Remove-NetFirewallRule | Out-Null
-        Write-Warn "Recreating firewall rule '$DisplayName' to match TCP $LocalPort."
+        Write-Warn "Recreating firewall rule '$DisplayName' to match TCP $LocalPort on profile '$Profile'."
     }
     if ($recreateRule -or $existingRules.Count -eq 0) {
         New-NetFirewallRule `
@@ -208,8 +241,8 @@ function Ensure-FirewallRule {
             -LocalPort $LocalPort `
             -Protocol TCP `
             -Action Allow `
-            -Profile Any | Out-Null
-        Write-Success "Firewall rule '$DisplayName' allows inbound TCP $LocalPort."
+            -Profile $Profile | Out-Null
+        Write-Success "Firewall rule '$DisplayName' allows inbound TCP $LocalPort on profile '$Profile'."
         return
     }
     Enable-NetFirewallRule -DisplayName $DisplayName | Out-Null
@@ -259,9 +292,9 @@ try {
 
     Write-Section 'Checking Windows localhost target'
     if (-not (Test-TcpEndpoint -Address $ConnectAddress -Port $ConnectPort)) {
-        Exit-WithError "Nothing is listening on $ConnectAddress:$ConnectPort. Start the Windows proxy first or rerun with the correct -ConnectAddress/-ConnectPort."
+        Exit-WithError "Nothing is listening on ${ConnectAddress}:$ConnectPort. Start the Windows proxy first or rerun with the correct -ConnectAddress/-ConnectPort."
     }
-    Write-Success "$ConnectAddress:$ConnectPort is reachable from Windows."
+    Write-Success "${ConnectAddress}:$ConnectPort is reachable from Windows."
 
     Write-Section 'Preparing Windows networking prerequisites'
     Ensure-IpHelperService
@@ -271,6 +304,7 @@ try {
     Write-Success "Current WSL-facing Windows host IP is $listenAddress."
 
     Write-Section 'Reconciling portproxy rule'
+    $firewallProfile = 'Any'
     $rules = Get-PortProxyRules -NetshPath $netshPath
     $exactRule = $rules | Where-Object {
         $_.ListenAddress -eq $listenAddress -and
@@ -279,10 +313,8 @@ try {
         $_.ConnectPort -eq $ConnectPort
     } | Select-Object -First 1
     $conflictingRules = $rules | Where-Object {
-        (
-            ($_.ListenAddress -eq $listenAddress -and $_.ListenPort -eq $ListenPort) -or
-            ($_.ListenPort -eq $ListenPort -and $_.ConnectAddress -eq $ConnectAddress -and $_.ConnectPort -eq $ConnectPort)
-        ) -and -not (
+        $_.ListenAddress -eq $listenAddress -and
+        $_.ListenPort -eq $ListenPort -and -not (
             $_.ListenAddress -eq $listenAddress -and
             $_.ListenPort -eq $ListenPort -and
             $_.ConnectAddress -eq $ConnectAddress -and
@@ -302,15 +334,15 @@ try {
                 "connectport=$ConnectPort",
                 "connectaddress=$ConnectAddress"
             ) `
-            -Description "Creating portproxy rule $listenAddress:$ListenPort -> $ConnectAddress:$ConnectPort")
-        Write-Success "Configured portproxy rule $listenAddress:$ListenPort -> $ConnectAddress:$ConnectPort."
+            -Description "Creating portproxy rule ${listenAddress}:$ListenPort -> ${ConnectAddress}:$ConnectPort")
+        Write-Success "Configured portproxy rule ${listenAddress}:$ListenPort -> ${ConnectAddress}:$ConnectPort."
     }
     else {
         Write-Success 'Portproxy rule already matches the current WSL host IP.'
     }
 
     Write-Section 'Reconciling firewall rule'
-    Ensure-FirewallRule -DisplayName $FirewallRuleName -LocalPort $ListenPort
+    Ensure-FirewallRule -DisplayName $FirewallRuleName -LocalPort $ListenPort -Profile $firewallProfile
 
     Write-Section 'Verifying from WSL'
     $finalRule = Get-PortProxyRules -NetshPath $netshPath | Where-Object {
@@ -320,12 +352,12 @@ try {
         $_.ConnectPort -eq $ConnectPort
     } | Select-Object -First 1
     if ($null -eq $finalRule) {
-        throw "The expected portproxy rule $listenAddress:$ListenPort -> $ConnectAddress:$ConnectPort was not present after repair."
+        throw "The expected portproxy rule ${listenAddress}:$ListenPort -> ${ConnectAddress}:$ConnectPort was not present after repair."
     }
     if (-not (Test-WslPortReachability -WslExePath $wslExePath -TargetDistro $DistroName -ListenAddress $listenAddress -ListenPort $ListenPort)) {
-        throw "WSL still could not reach $listenAddress:$ListenPort after repair. Recheck your Windows proxy process and local firewall rules."
+        throw "WSL still could not reach ${listenAddress}:$ListenPort after repair. Recheck your Windows proxy process and local firewall rules."
     }
-    Write-Success "WSL can reach $listenAddress:$ListenPort."
+    Write-Success "WSL can reach ${listenAddress}:$ListenPort."
     Write-Host ("{0}:{1} -> {2}:{3}" -f $finalRule.ListenAddress, $finalRule.ListenPort, $finalRule.ConnectAddress, $finalRule.ConnectPort)
     Write-Success 'WSL localhost forwarding repair completed successfully.'
 }
