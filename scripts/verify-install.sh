@@ -21,6 +21,13 @@ FAIL=0
 pass() { printf '\033[1;32mok\033[0m   %s\n' "$1"; }
 fail() { printf '\033[1;31mfail\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 note() { printf '\033[0;37m       %s\033[0m\n' "$1"; }
+die_tmux() {
+  printf '\033[1;31mfail\033[0m %s\n' "$1"
+  note "See TROUBLESHOOTING.md Issue 11: TROUBLESHOOTING.md#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡"
+  exit 1
+}
+
+TMUX_MIN_VERSION=3.3
 
 check_cmd() {
   local cmd=$1 label=$2
@@ -28,6 +35,31 @@ check_cmd() {
     pass "$label found at $(command -v "$cmd")"
   else
     fail "$label ($cmd) not on PATH"
+  fi
+}
+
+normalize_tmux_version() {
+  printf '%s\n' "$1" | sed -E 's/^[^0-9]*//'
+}
+
+check_tmux_version() {
+  local raw_version normalized_version
+
+  if ! command -v tmux >/dev/null 2>&1; then
+    return
+  fi
+
+  raw_version="$(tmux -V 2>/dev/null | awk '{print $2}')"
+  normalized_version="$(normalize_tmux_version "$raw_version")"
+
+  if [ -z "$normalized_version" ]; then
+    die_tmux "tmux version could not be parsed from '$(tmux -V 2>/dev/null)'; detached AO/Codex sessions are blocked until tmux is 3.3+."
+  fi
+
+  if dpkg --compare-versions "$normalized_version" ge "$TMUX_MIN_VERSION"; then
+    pass "tmux version ${raw_version} meets detached-session minimum (>= ${TMUX_MIN_VERSION})"
+  else
+    die_tmux "tmux version ${raw_version} is too old; Ubuntu 22.04 apt tmux 3.2a has a NULL-pointer segfault bug, so detached AO/Codex sessions are blocked until tmux is 3.3+."
   fi
 }
 
@@ -45,6 +77,7 @@ echo
 echo "=== 2. Linux toolchain ==="
 check_cmd git         "git"
 check_cmd tmux        "tmux"
+check_tmux_version
 check_cmd node        "Node.js"
 check_cmd npm         "npm"
 check_cmd pnpm        "pnpm"

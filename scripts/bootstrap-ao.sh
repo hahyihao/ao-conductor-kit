@@ -11,6 +11,12 @@ set -euo pipefail
 BASE_PACKAGES=(git tmux build-essential curl ca-certificates gnupg xz-utils unzip)
 AO_ROOT=/root/agent-orchestrator
 AO_BIN="$AO_ROOT/packages/ao/bin/ao.js"
+TMUX_MIN_VERSION=3.3
+TMUX_SOURCE_VERSION=3.5a
+TMUX_RELEASE_URL="https://github.com/tmux/tmux/releases/download/${TMUX_SOURCE_VERSION}/tmux-${TMUX_SOURCE_VERSION}.tar.gz"
+TMUX_TARBALL="/tmp/tmux-${TMUX_SOURCE_VERSION}.tar.gz"
+TMUX_SRC_DIR="/tmp/tmux-${TMUX_SOURCE_VERSION}"
+TMUX_BACKUP_BIN=/usr/bin/tmux.3.2a.backup
 
 log_step() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 log_skip() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
@@ -38,6 +44,35 @@ node_major() {
   node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/'
 }
 
+normalize_tmux_version() {
+  printf '%s\n' "$1" | sed -E 's/^[^0-9]*//'
+}
+
+tmux_version_raw() {
+  tmux -V 2>/dev/null | awk '{print $2}'
+}
+
+tmux_version_meets_min() {
+  local version
+  version="$(normalize_tmux_version "${1:-}")"
+  [[ -n "$version" ]] || return 1
+  dpkg --compare-versions "$version" ge "$TMUX_MIN_VERSION"
+}
+
+pick_ncurses_dev_package() {
+  if apt-cache show libncurses5-dev >/dev/null 2>&1; then
+    printf '%s\n' libncurses5-dev
+    return
+  fi
+
+  if apt-cache show libncurses-dev >/dev/null 2>&1; then
+    printf '%s\n' libncurses-dev
+    return
+  fi
+
+  die "Could not find an ncurses development package required to build tmux."
+}
+
 ao_is_ready() {
   [[ -d "$AO_ROOT/.git" ]] &&
     [[ -f "$AO_BIN" ]] &&
@@ -53,6 +88,87 @@ install_base_packages() {
   log_step "Installing apt base packages"
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${BASE_PACKAGES[@]}"
+}
+
+install_tmux_build_dependencies() {
+  local ncurses_pkg
+  apt-get update -qq
+  ncurses_pkg="$(pick_ncurses_dev_package)"
+
+  log_step "Installing tmux build dependencies"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    libevent-dev \
+    "$ncurses_pkg" \
+    pkg-config \
+    automake \
+    autoconf \
+    bison
+}
+
+build_tmux_from_source() {
+  log_step "Building tmux ${TMUX_SOURCE_VERSION} from source"
+  rm -rf "$TMUX_SRC_DIR"
+  curl -fsSL -o "$TMUX_TARBALL" "$TMUX_RELEASE_URL"
+  tar -xf "$TMUX_TARBALL" -C /tmp
+
+  cd "$TMUX_SRC_DIR"
+  ./configure --prefix=/usr/local
+  make -j"$(nproc)"
+  make install
+}
+
+ensure_usr_bin_tmux_target() {
+  if [[ ! -x /usr/local/bin/tmux ]]; then
+    die "Expected /usr/local/bin/tmux after source build, but it was not found."
+  fi
+
+  if [[ -L /usr/bin/tmux ]] && [[ "$(readlink -f /usr/bin/tmux)" == "/usr/local/bin/tmux" ]]; then
+    log_skip "/usr/bin/tmux already points to /usr/local/bin/tmux"
+    return
+  fi
+
+  if [[ -e /usr/bin/tmux && ! -L /usr/bin/tmux ]]; then
+    if [[ ! -e "$TMUX_BACKUP_BIN" ]]; then
+      mv /usr/bin/tmux "$TMUX_BACKUP_BIN"
+      log_note "Preserved previous /usr/bin/tmux as $TMUX_BACKUP_BIN"
+    else
+      log_note "Backup already exists at $TMUX_BACKUP_BIN"
+      rm -f /usr/bin/tmux
+    fi
+  fi
+
+  ln -sfn /usr/local/bin/tmux /usr/bin/tmux
+  log_note "/usr/bin/tmux now points to /usr/local/bin/tmux"
+}
+
+ensure_safe_tmux() {
+  local current_version current_path
+  current_version=
+  current_path=
+
+  if command -v tmux >/dev/null 2>&1; then
+    current_path="$(command -v tmux)"
+    current_version="$(tmux_version_raw || true)"
+    if tmux_version_meets_min "$current_version"; then
+      log_skip "tmux ${current_version} at ${current_path} already meets minimum >= ${TMUX_MIN_VERSION}"
+      if [[ -x /usr/local/bin/tmux ]]; then
+        ensure_usr_bin_tmux_target
+      fi
+      return
+    fi
+
+    log_step "Upgrading tmux from source because ${current_version:-unknown} at ${current_path} is below ${TMUX_MIN_VERSION}"
+  else
+    log_step "Installing tmux ${TMUX_SOURCE_VERSION} from source because tmux is missing"
+  fi
+
+  install_tmux_build_dependencies
+  build_tmux_from_source
+  ensure_usr_bin_tmux_target
+
+  current_version="$(tmux_version_raw || true)"
+  tmux_version_meets_min "$current_version" || die "tmux upgrade failed; expected >= ${TMUX_MIN_VERSION}, got ${current_version:-missing}"
+  log_note "tmux ${current_version} is ready for detached AO/Codex sessions"
 }
 
 install_nodejs() {
@@ -171,6 +287,7 @@ verify_toolchain() {
 main() {
   require_root
   install_base_packages
+  ensure_safe_tmux
   install_nodejs
   install_pnpm
   install_ai_clis
