@@ -11,6 +11,7 @@
 
 因此 CEO 应优先重新观察 `ao status`、`gh pr list` 和现场 pane，
 而不是靠记忆、memo 或缓存来维持 dispatch 状态。
+AO Kit x Superpowers 的层级边界见 `skills/references/aokit-x-superpowers.md`。
 
 ## 1. 适用范围
 
@@ -49,9 +50,9 @@ dispatch-class 意图示例：
 |---|---|---|
 | XS | 单文件、<15 分钟、可逆 | `0`，且仅限现有 Mode A 规则已允许时 |
 | S | 1-2 文件、单 PR、无独立并行面向 | `1` |
-| M | 3-6 文件、粗看像 2-4 个独立面向 | `2-3` |
-| L | 多模块、粗看 5+ 独立面向 | `4-N`，上限是空闲 PM 数 |
-| XL | 跨项目 / 跨 round / 长依赖链 | planning-first mandatory |
+| M | 3-6 文件、粗看像 2-4 个独立面向 | 默认先 `1` 个 planning PM；有 approved `mini-spec` 后再 `2-3` |
+| L | 多模块、粗看 5+ 独立面向 | 默认先 `1` 个 planning PM；有 approved `spec` 后再 `4-N` |
+| XL | 跨项目 / 跨 round / 长依赖链 | planning-first mandatory，通常先产出完整 `spec` |
 
 这里的“粗看”是硬要求：
 
@@ -60,11 +61,14 @@ dispatch-class 意图示例：
 - 看依赖关系是否明显复杂
 
 **不要**在同一次 user message 收到后的当前 CEO turn 内把 subtasks 数出来，再反推 volume。
+如果当前用户消息已经带着 approved `mini-spec / spec draft` 或等价结构化计划，
+`M/L` 才可以直接按 implementation fan-out 的 `N` 处理。
 
 ## 4. planning-first 触发条件
 
 以下情况先派 1 个 planning PM：
 
+- `task volume >= M` 且当前用户消息没有 approved `mini-spec / spec`
 - 任务形状不确定
 - research-heavy
 - dependency-heavy
@@ -74,9 +78,10 @@ dispatch-class 意图示例：
 
 planning-first 时：
 
-1. 先派 1 个 planning PM
-2. 等规划结果返回后，只有当该结果以**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
-3. 在 planning 返回前，不存在 CEO 内部“待派发”列表，也不存在“先记着，等下条 turn 再派”的缓存
+1. 先派 1 个 planning PM，并要求它回报 `mini-spec / spec draft`
+2. 只有当前用户消息已经带着 approved `mini-spec / spec` 时，才允许跳过 brainstorming gate
+3. 等规划结果返回后，只有当该结果以**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
+4. 在 planning 返回前，不存在 CEO 内部“待派发”列表，也不存在“先记着，等下条 turn 再派”的缓存
 
 ## 5. PM 池上限与饱和处理
 

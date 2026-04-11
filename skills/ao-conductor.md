@@ -23,7 +23,17 @@ type: skill
 参考资料：
 - `skills/references/ceo-classification.md`
 - `skills/references/silent-failure-detection.md`
+- `skills/references/aokit-x-superpowers.md`
 - `experts/general/task-splitter.md`
+
+AO Kit x Superpowers 合并后的层级边界如下：
+
+- AO Kit 继续负责 infra + dispatch，保留零 backlog、same-user-message 首次 fan-out 边界和池饱和阻塞
+- Superpowers 只增加执行纪律，不覆盖 AO Kit 的 dispatch 规则
+- 新增三条硬约束：
+  1. `task volume >= M` 且当前用户消息没有 approved `mini-spec / spec` 时，默认先走 planning-first，由 planning PM 产出草案
+  2. 每个 PR 都必须先过 spec-compliance pass，再过 code-quality pass
+  3. 两阶段 reviewer 都通过后，CEO 还必须派独立 verifier worker 跑 Gate Function；CEO 自己不读 raw diff，也不跑 tests / build
 
 ## 0. 设计动机（不得删除）
 
@@ -148,17 +158,20 @@ CEO 不做微观子任务计数，不写子任务列表，不自己替 PM 设计
 |---|---|---|
 | XS | 单文件、<15 分钟、可逆 | `0`，且仅当现有 Mode A 规则已允许 CEO 直接做 |
 | S | 1-2 文件、单 PR、无独立并行子任务 | `1` |
-| M | 3-6 文件、粗看像 2-4 个独立面向 | `2-3` |
-| L | 多模块、粗看 5+ 独立面向 | `4-N`，上限受真实空闲 PM 数约束 |
-| XL | 跨项目 / 跨 round / 长依赖链 | 强制走 planning-first |
+| M | 3-6 文件、粗看像 2-4 个独立面向 | 默认先 `1` 个 planning PM；有 approved `mini-spec` 后再 `2-3` |
+| L | 多模块、粗看 5+ 独立面向 | 默认先 `1` 个 planning PM；有 approved `spec` 后再 `4-N` |
+| XL | 跨项目 / 跨 round / 长依赖链 | 强制先 `1` 个 planning PM，通常先产出完整 `spec` |
 
 **重要：这是查表，不是精算。**
 你只能做“一眼粗看”的分类判断，不能在同一次 user message 收到后的当前 CEO turn 内自己枚举 subtasks。
+如果当前用户消息已经自带 approved `mini-spec / spec draft` 或等价结构化计划，
+`M/L` 可以直接按 implementation fan-out 的 `N` 进入实现阶段；否则默认先走 brainstorming gate。
 
 ### 2.3 planning-first 分支
 
 以下情况不要直接多 PM fan-out，而是先派 **1 个 planning PM**：
 
+- `task volume >= M` 且当前用户消息没有 approved `mini-spec / spec`
 - 任务形状不确定
 - research 成分重
 - 依赖链长
@@ -168,9 +181,10 @@ CEO 不做微观子任务计数，不写子任务列表，不自己替 PM 设计
 
 planning-first 的规则：
 
-1. 只派 1 个 planning PM
-2. 等它回报结构化计划后，只有把该回报作为**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
-3. planning 阶段 CEO 仍然零 backlog；此时并不存在“其他 PM 等着以后再派”
+1. 只派 1 个 planning PM，由它回报 `mini-spec / spec draft` 或等价结构化计划
+2. 只有当前用户消息已经带着 approved `mini-spec / spec` 时，才允许跳过 brainstorming gate 直接进入 implementation fan-out
+3. 等 planning PM 回报后，只有把该回报作为**新一轮 user message 边界**重新进入 dispatch 时，才允许第二波 fan-out
+4. planning 阶段 CEO 仍然零 backlog；此时并不存在“其他 PM 等着以后再派”
 
 如果没有空闲 PM 能接这 1 个 planning 任务，直接向用户报告池已饱和；
 不要缓存，不要延后。
@@ -204,6 +218,7 @@ planning-first 的规则：
 - “我先派一半，剩下的下轮再补”
 - “我先按较小 N 派出去，剩余的等有空再说”
 - “我先记进内部清单，等 PM 空闲再自动发”
+- “我先找 1 个 implement PM 顶一下，其他实现等 spec 出来再补”
 
 ### 2.5 静默失败检测
 
@@ -229,16 +244,19 @@ dispatch 完成后，沿用静默失败检测，但**去掉 backlog 自愈逻辑
 
 ## 3. Dispatch 协议
 
-当意图属于 dispatch-class 且不落入 Mode A 时，CEO 的标准动作顺序只有下面 6 步：
+当意图属于 dispatch-class 且不落入 Mode A 时，CEO 的标准动作顺序只有下面 8 步：
 
 1. 读取用户意图
 2. 分类 `task type × task volume`
-3. 由查表决定默认并发度 `N`，并选出目标 PM 集
-4. 在**同一次 user message 收到后的当前 CEO turn** 内把完整自然语言目标包 fan-out 给 `N` 个 PM
+3. 如果 `volume >= M` 且没有 approved `mini-spec / spec`，把当前 turn 的目标 `N` 固定为 `1` 个 planning PM；否则按 implementation fan-out 选择目标 PM 集
+4. 在**同一次 user message 收到后的当前 CEO turn** 内把完整自然语言目标包 fan-out 给这一轮所需的目标会话
 5. 对每一条 fan-out 做 post-dispatch 10 秒验证；验证失败就强制 Enter 或重发
-6. 等 reviewer 报告，再向用户汇报
+6. implementer PR ready 后，先拿 spec-compliance reviewer 报告
+7. spec-compliance 通过后，再拿 code-quality reviewer 报告
+8. 两阶段 reviewer 都通过后，再 dispatch 独立 verifier worker 跑 Gate Function，并根据 exit code + evidence 向用户汇报
 
 其中第 4 步是硬约束：**同一条 user message 触发的首次 fan-out 必须在收到该消息后的当前 CEO turn 发完。**
+如果第 3 步走的是 planning-first，后续 implementation fan-out 仍然必须等新的 user message 边界。
 验证失败后的补发可以跨 turn，但那属于对这次首次 fan-out 的修复，不属于“先缓存后补派”。
 
 ### 3.1 Mode A / B / C 的新含义
@@ -247,10 +265,11 @@ dispatch 完成后，沿用静默失败检测，但**去掉 backlog 自愈逻辑
 只适用于非 dispatch 意图，或 `XS` 且已被现有 Mode A 规则允许的任务。
 
 `Mode B — single PM`
-适用于 dispatch-class 且 `N=1` 的情况，包括 planning-first。
+适用于 dispatch-class 且当前轮 `N=1` 的情况，包括 planning-first 和单 PM implementation dispatch。
 
 `Mode C — parallel dispatch`
-适用于 dispatch-class 且 `N>=2` 的情况。
+适用于 dispatch-class 且 `N>=2` 的 implementation fan-out。
+`volume >= M` 但没有 approved `mini-spec / spec` 时，不能直接跳进 Mode C。
 是否是 2 个、3 个还是更多，由 `type × volume` 粗粒度查表决定，
 不是靠 CEO 先拆出一串 subtasks 再反推人数。
 
@@ -262,6 +281,7 @@ CEO 发给 PM 的永远是**完整自然语言目标包**，而不是子任务�
 - 你判定的 `task type`
 - 你判定的 `task volume`
 - 是否是 planning-first
+- 对 `M/L/XL` 是否已具备 approved `mini-spec / spec`
 - 目标仓库 / issue / PR / 约束 / 验收标准
 
 但你**不能**：
@@ -282,6 +302,8 @@ PM 接到后，自己按 `experts/general/task-splitter.md` 处理计划、brief
 - 写 CEO 自己的 subtasks brief，再把它伪装成“并发度判断”
 - 用 cache / state file / memo / hidden notebook 优化 dispatch 速度
 - 在未重新观察 `ao status` / `gh pr list` / tmux 状态的情况下，凭记忆判断“谁应该空闲了”
+- CEO 直接跑 tests / build / Gate Function，或把 implementer 自报绿灯当成验证证据
+- CEO 直接读 raw diff，绕过 spec-compliance / code-quality reviewer 的结构化报告
 
 如果没有可用 PM：
 
@@ -291,9 +313,9 @@ PM 接到后，自己按 `experts/general/task-splitter.md` 处理计划、brief
 
 **不要缓存。不要自动补派。不要维持内部队列。**
 
-## 5. 监控与审阅
+## 5. 监控、两阶段审阅与 Gate Function
 
-PM 接单以后，你的职责是监控和审阅，而不是消失。
+PM 接单以后，你的职责是监控和推进 gate，而不是消失。
 常用观察入口：
 
 ```bash
@@ -303,17 +325,37 @@ gh pr view <pr-number>
 ```
 
 向用户汇报时做紧凑摘要，不要直接贴原始终端输出。
-CEO 的审阅输入应当是 **reviewer 的结构化报告** 和 PR 状态摘要；
-**不要自己去读 raw diff**，那是 reviewer 的边界。
+CEO 的审阅 / 验证输入应当是 **reviewer 或 verifier 的结构化报告** 和 PR 状态摘要；
+**不要自己去读 raw diff，也不要自己跑 tests / build**。
+
+固定顺序必须是：
+
+1. `spec-compliance`：reviewer 对照 brief、`mini-spec / spec` 和边界要求确认是否缺项、越界或偏题
+2. `code-quality`：只有第 1 阶段通过后才进入，reviewer 再检查实现质量、风险、回归和可维护性
+3. `Gate Function`：两阶段 reviewer 都通过后，CEO 再 dispatch 独立 verifier worker 跑命令、测试或验证脚本
+
+Gate Function 的 verifier 报告至少要包含：
+
+- 整体 pass / fail
+- 实际运行的命令列表
+- 每条命令的 exit code
+- 关键 evidence 摘要，以及 log / artifact 路径
+
+如果任一阶段要求返工：
+
+- 返工后不得跳过 re-review
+- 只要 spec、行为边界或验收口径变了，就先回到 `spec-compliance`，再跑 `code-quality`
+- 任何代码改动完成后，最终都要重新跑 verifier Gate Function
 
 重点汇报：
 
 - 哪些 PM 已接单、已开分支、已开 PR
-- 哪些 PR 已进入 reviewer / CI
+- 哪些 PR 卡在 `spec-compliance`、`code-quality` 或 verifier Gate Function
+- verifier 的 exit code / evidence 是否已经到位
 - 是否有 session 静默、验证失败或池饱和风险
 
 如果所有 PM 都 idle，说明当前池空闲；
-不是提醒你去翻 hidden backlog。
+reviewer / verifier 也都 idle 时，同样不是提醒你去翻 hidden backlog。
 
 ## 6. 何时不要使用这个 skill
 

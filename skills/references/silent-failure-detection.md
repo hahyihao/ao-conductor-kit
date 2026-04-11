@@ -2,7 +2,7 @@
 
 本文件描述 CEO 零 backlog doctrine 下的静默失败检测。
 目标不是“自愈 CEO 手里的 backlog”，
-而是尽快发现 fan-out 丢失、会话无响应、状态误读和 dashboard 假象。
+而是尽快发现 fan-out 丢失、会话无响应、状态误读、两阶段审阅漏跑和 Gate Function 假阳性。
 
 ## 0. 设计动机：为什么宁可重观察，也不靠记忆
 
@@ -34,7 +34,9 @@ CEO 不持有 backlog，因此也没有 backlog 自愈。
 - `ao send` 是否真的发出去了
 - 目标 PM 是否真的进入工作态
 - dashboard / PR / tmux 观测是否一致
-- reviewer 报告是否回来了
+- `spec-compliance` reviewer 报告是否回来了
+- `code-quality` reviewer 报告是否回来了
+- verifier worker 是否回报了 exit code + evidence bundle
 
 ## 2. Post-dispatch 10 秒验证必须保留
 
@@ -63,7 +65,24 @@ CEO 不持有 backlog，因此也没有 backlog 自愈。
 也不要把一次性结果行误判成持续进度。
 如果现场工具支持多源观测，优先把进行时和过去时分开匹配，再做交叉核对。
 
-## 4. P3：Dashboard authority 仍然成立
+## 4. 审阅链和 Gate Function 也要防静默失败
+
+AO Kit x Superpowers 合并后，review / verify 的正确链路是：
+
+1. `spec-compliance`
+2. `code-quality`
+3. verifier worker 执行 Gate Function
+
+要主动捕捉的静默失败包括：
+
+- 直接跳过 `spec-compliance`，把 code-quality 当成唯一 review
+- 把同一份 reviewer 结论误当成两阶段都已完成
+- reviewer 已通过，但 verifier worker 根本没有被 dispatch
+- verifier 报告缺少 exit code、命令列表或 evidence，却被误判成“已经过 gate”
+
+这些失败和 backlog 无关，但同样会因为 CEO 过度依赖记忆或口头描述而静默发生。
+
+## 5. P3：Dashboard authority 仍然成立
 
 下列信号源的优先级高于 CEO 记忆和 worker 自述：
 
@@ -71,20 +90,21 @@ CEO 不持有 backlog，因此也没有 backlog 自愈。
 2. dashboard / session activity
 3. `gh pr list`、`gh pr view`
 4. tmux pane 现场输出
+5. verifier 报告里的 exit code、命令记录和 artifact 路径
 
 如果这些信号互相矛盾，先报告矛盾，再继续观察；
 不要用“我记得它刚才应该已经发出去了”来覆盖现场事实。
 
-## 5. 巡检时不再做 backlog 自愈
+## 6. 巡检时不再做 backlog 自愈
 
 如果巡检发现 PM 池全部 idle：
 
-- 正确动作：向用户汇报当前池空闲，等待下一条用户意图或 reviewer 报告
+- 正确动作：向用户汇报当前池空闲，等待下一条用户意图、reviewer 报告或 verifier 报告
 - 错误动作：从隐藏 backlog / TODO / pending queue 里补派任务
 
 如果需要 wake-up，只能用于：
 
-- 被动等待 reviewer 回报
+- 被动等待 reviewer 或 verifier 回报
 - 定期重新观察现场状态
 
 wake-up 不能承载：
