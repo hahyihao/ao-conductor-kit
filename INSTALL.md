@@ -351,48 +351,40 @@ timeout 40 codex exec --sandbox read-only --skip-git-repo-check "say hi in 3 wor
 - `auth.json` 权限过宽
 - `codex exec` 超时或返回认证错误
 
-## Phase 5 — 配置 Windows 代理端口转发
+## Phase 5 — 修复 Windows 代理端口转发
 ### 这一阶段要完成什么
-这一步的目标是让 WSL 能通过 Windows 上已经运行的代理软件访问外网。最常见的场景是：你在 Windows 上打开了 Clash Verge，它在本机 `127.0.0.1:7897` 监听 HTTP 代理；但 WSL 里的 Linux 环境无法直接访问 Windows 的 `127.0.0.1`，所以需要一个从 WSL 网关地址转发到 Windows 本地端口的桥。
+这一步的目标是让 WSL 能通过 Windows 上已经运行的代理软件访问外网。最常见的场景是：你在 Windows 上打开了 Clash Verge，它在本机 `127.0.0.1:7897` 监听 HTTP 代理；但 WSL2 的 `localhostForwarding=true` 偶尔会失效，所以仓库现在提供了一个**自愈脚本**来自动探测当前 WSL 面向 Windows 的主机 IP，并修复 `portproxy` 漂移。
 
-本文示例使用 `172.17.224.1:7897 -> 127.0.0.1:7897`。如果你的 WSL 网关地址不是 `172.17.224.1`，或者 Clash Verge 的端口不是 `7897`，下面所有命令都要同步改成你的实际值。
+如果你在运行 `scripts/bootstrap-wsl2.ps1` 时，Windows 代理已经在 `127.0.0.1:7897` 监听，bootstrap 脚本会自动尝试做同样的修复。`Phase 5` 仍然是推荐的显式入口，因为它可以在换网段、重装 WSL 或代理重启后单独重复执行，而且同一条命令可以安全重跑。
 
 ### 前提检查
-先确保你的代理软件已经在 Windows 上运行，并确认它的 HTTP 代理端口。然后在 Windows 里执行一次 `ipconfig`，找到名为 `vEthernet (WSL)` 的适配器，确认它的 IPv4 地址。
+先确保你的代理软件已经在 Windows 上运行，并确认它的 HTTP 代理端口。默认示例端口仍然使用 `7897`，如果你的代理软件用的是别的端口，下面命令里的 `-ListenPort` 和 `-ConnectPort` 都要一起改。
 
-这个地址在很多机器上是 `172.17.224.1`，但它不是不可变常量。不要盲抄示例，先核对自己的机器。
+另外，PowerShell 必须是“管理员身份”，而且 `Ubuntu-22.04` 已经通过前面的 WSL2 引导步骤导入为 WSL2 发行版。
 
 ### 要执行的命令
-先确认 `vEthernet (WSL)` 地址。
-
 命令环境：Windows PowerShell（管理员）
 ```powershell
-ipconfig
-```
-
-确认无误后，添加端口转发和防火墙规则。
-
-命令环境：Windows PowerShell（管理员）
-```powershell
-netsh interface portproxy add v4tov4 listenport=7897 listenaddress=172.17.224.1 connectport=7897 connectaddress=127.0.0.1
-New-NetFirewallRule -DisplayName "WSL Clash Proxy 7897" -Direction Inbound -LocalPort 7897 -Protocol TCP -Action Allow
-netsh interface portproxy show all
+powershell -ExecutionPolicy Bypass -File scripts\repair-wsl2-localhost-forwarding.ps1 -DistroName Ubuntu-22.04 -ListenPort 7897 -ConnectPort 7897
 ```
 
 ### 预期输出
-你需要看到两个结果：
+你需要看到下面这几类结果：
 
-- `New-NetFirewallRule` 返回一条已创建的防火墙规则信息。
-- `netsh interface portproxy show all` 能看到一条 `172.17.224.1:7897 -> 127.0.0.1:7897` 的映射。
+- 脚本会打印当前探测到的 WSL 面向 Windows 的主机 IP，例如 `172.x.x.x`。
+- 如果旧的 `portproxy` 规则还绑在旧 IP 上，脚本会删除旧规则并重建。
+- 如果规则本来就是最新状态，脚本会明确告诉你“already up to date”之类的结果。
+- 脚本会确保对应的 Windows 防火墙规则存在，并在最后从 WSL 侧做一次连通性验证。
 
-如果你使用的不是 7897 端口，那么这里显示的目标映射也应与自己实际端口一致。端口号只要前后一致即可，不要求一定是 7897。
+如果你使用的不是 `7897` 端口，那么输出里的目标端口也应与你的实际端口一致。端口号只要前后一致即可，不要求一定是 `7897`。
 
 ### 如何验证
-Windows 侧确认完映射后，最好的验证办法是在 WSL 里通过这个地址访问外网。
+最好的验证办法是在 WSL 里动态取当前 Windows host IP，再通过这个地址访问外网。
 
 命令环境：WSL bash（root）
 ```bash
-HTTPS_PROXY=http://172.17.224.1:7897 curl -I https://github.com
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" curl -I https://github.com
 ```
 
 如果代理链路正确，你通常会看到来自 GitHub 的 HTTP 响应头，例如 `HTTP/2 200` 或 `HTTP/2 302`。只要不是连接超时、连接被拒绝或 DNS 失败，就说明这一步基本通了。
@@ -400,8 +392,8 @@ HTTPS_PROXY=http://172.17.224.1:7897 curl -I https://github.com
 ### 排错入口
 这一阶段排错时，请重点看 `TROUBLESHOOTING.md` 中这些症状：
 
-- `ipconfig` 找不到 `vEthernet (WSL)`
-- 端口转发规则添加失败
+- 自愈脚本无法探测当前 WSL host IP
+- 端口转发规则修复失败
 - 防火墙规则未生效
 - WSL 中 `curl` 走代理仍超时
 - Clash Verge 端口不是 7897
@@ -413,15 +405,22 @@ HTTPS_PROXY=http://172.17.224.1:7897 curl -I https://github.com
 这一步非常重要，但还不够。根据 2026-04-11 的实测经验，**仅靠全局 git 代理配置并不总是足够稳定**。在大推送或特殊网络情况下，`git push` 仍建议显式附带 `HTTPS_PROXY=...` 环境变量作为双保险。
 
 ### 前提检查
-开始之前，先确保 `Phase 5` 已经通过，也就是你已经能在 WSL 里通过 `curl` 使用 `http://172.17.224.1:7897` 访问 GitHub。
+开始之前，先确保 `Phase 5` 已经通过。最稳妥的做法是先取一次当前 Windows host IP，然后确认 `curl` 能通过这个地址访问 GitHub。
+
+命令环境：WSL bash（root）
+```bash
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" curl -I https://github.com
+```
 
 如果你此时连 `curl -I https://github.com` 都还不通，不要继续设置 git 代理。因为 Git 本身只会把网络问题暴露得更隐蔽，不会自动帮你修好它。
 
 ### 要执行的命令
 命令环境：WSL bash（root）
 ```bash
-git config --global http.proxy http://172.17.224.1:7897
-git config --global https.proxy http://172.17.224.1:7897
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+git config --global http.proxy "http://${WSL_HOST_IP}:7897"
+git config --global https.proxy "http://${WSL_HOST_IP}:7897"
 git config --global --get http.proxy
 git config --global --get https.proxy
 ```
@@ -430,14 +429,15 @@ git config --global --get https.proxy
 
 命令环境：WSL bash（root）
 ```bash
-HTTPS_PROXY=http://172.17.224.1:7897 git push origin main
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" git push origin main
 ```
 
 ### 预期输出
-前四条 `git config` 命令通常不会返回很多文字，但两条 `--get` 命令应分别打印：
+前四条 `git config` 命令通常不会返回很多文字，但两条 `--get` 命令应分别打印形如下面这种值：
 
 ```text
-http://172.17.224.1:7897
+http://172.x.x.x:7897
 ```
 
 最后那条 `git push` 示例命令在这一步不要求立刻真的推送你的主仓库；它的作用是告诉你，后面凡是需要推送，都建议保留这个环境变量前缀。
@@ -454,7 +454,8 @@ git config --global --list | grep -E 'http\.proxy|https\.proxy'
 
 命令环境：WSL bash（root）
 ```bash
-HTTPS_PROXY=http://172.17.224.1:7897 git ls-remote https://github.com/git/git HEAD
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" git ls-remote https://github.com/git/git HEAD
 ```
 
 只要能返回一个提交哈希和 `HEAD`，就说明 Git 经由该代理访问外网基本正常。
@@ -550,7 +551,7 @@ git config --global --get-all credential.helper
 
 1. `ao --help` 能运行。
 2. `gh auth status` 正常。
-3. `HTTPS_PROXY=http://172.17.224.1:7897 git ls-remote https://github.com/git/git HEAD` 能返回结果。
+3. 先取当前 `WSL_HOST_IP`，再执行 `HTTPS_PROXY="http://${WSL_HOST_IP}:7897" git ls-remote https://github.com/git/git HEAD`，并确认它能返回结果。
 4. 你已经设置过 Git 身份信息；如果没有，需要先补。
 
 如果 Git 用户名和邮箱还没设，先执行下面两条。已经设过的用户可以跳过。
@@ -578,7 +579,8 @@ git commit -m "init"
 
 命令环境：WSL bash（root）
 ```bash
-HTTPS_PROXY=http://172.17.224.1:7897 gh repo create ao-hello --public --source=. --remote=origin --push
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" gh repo create ao-hello --public --source=. --remote=origin --push
 ```
 
 接着复制 AO 模板并修改 `repo`、`path` 字段。下面示例假设 `bootstrap-ao.sh` 默认把 agent-orchestrator 克隆到了 `/root/agent-orchestrator`；如果你的实际克隆路径不同，只替换左侧源文件路径即可。
@@ -645,7 +647,7 @@ curl -I http://localhost:3000
 只要 `scripts/bootstrap-wsl2.ps1` 明确提示你“需要重启后继续”，就先重启，不要在同一轮 Windows 会话里反复多次执行同一个脚本。对于全新 Windows 10 环境，这是正常路径，不是异常。
 
 ### 为什么代理已经通了，`git push` 还是会失败
-最常见的原因不是网络，而是认证。请先回到 `Phase 7` 检查 `gh auth status` 和 `gh auth setup-git` 是否成功。其次，再确认你推送时是否像文档那样保留了 `HTTPS_PROXY=http://172.17.224.1:7897` 这个前缀。
+最常见的原因不是网络，而是认证。请先回到 `Phase 7` 检查 `gh auth status` 和 `gh auth setup-git` 是否成功。其次，再确认你推送时是否像文档那样先取了当前 `WSL_HOST_IP`，并保留了 `HTTPS_PROXY="http://${WSL_HOST_IP}:7897"` 这个前缀。
 
 ### `codex exec` 有时能跑，有时超时，优先查哪一层
 优先顺序通常是：`base_url` 是否正确、代理是否稳定、API key 是否可用、代理是否支持 `responses` API。不要先把问题归因到 Codex CLI 本身。

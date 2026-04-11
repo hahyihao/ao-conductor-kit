@@ -2,19 +2,24 @@
 .PURPOSE
 Bootstrap WSL2 and Ubuntu 22.04 on Windows 10 21H1 for the AO Conductor Kit.
 .AUTHOR
-hahyihao (with AO-orchestrated Codex worker, 2026-04-11)
+hahyihao (with AO-orchestrated Codex worker, 2026-04-12)
 .DATE
-2026-04-11
+2026-04-12
 .TESTED ENVIRONMENT
 Windows 10 Pro 21H1 build 19043
 .USAGE
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1 -InstallPath "D:\WSL"
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1 -ProxyPort 8888
 #>
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$InstallPath = 'D:\WSL'
+    [string]$InstallPath = 'D:\WSL',
+
+    [Parameter()]
+    [ValidateRange(1, 65535)]
+    [int]$ProxyPort = 7897
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -31,6 +36,15 @@ function Normalize-Text {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return $null }
     return ($Text -replace "`r`n", "`n").Trim()
+}
+function Test-TcpEndpoint {
+    param([string]$Address, [int]$Port)
+    try {
+        return [bool](Test-NetConnection -ComputerName $Address -Port $Port -WarningAction SilentlyContinue -InformationLevel Quiet)
+    }
+    catch {
+        return $false
+    }
 }
 function Invoke-CheckedCommand {
     param([string]$FilePath, [string[]]$ArgumentList, [string]$Description, [int[]]$AllowedExitCodes = @(0))
@@ -83,9 +97,11 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $installRoot = $InstallPath
     $scriptPath = $MyInvocation.MyCommand.Path
-    $resumeCommand = 'powershell.exe -ExecutionPolicy Bypass -File "{0}" -InstallPath "{1}"' -f $scriptPath, $installRoot
+    $scriptDirectory = Split-Path -Parent $scriptPath
+    $resumeCommand = 'powershell.exe -ExecutionPolicy Bypass -File "{0}" -InstallPath "{1}" -ProxyPort {2}' -f $scriptPath, $installRoot, $ProxyPort
     $dismPath = Join-Path $env:WINDIR 'System32\dism.exe'
     $wslExePath = Join-Path $env:WINDIR 'System32\wsl.exe'
+    $powershellExePath = Join-Path $PSHOME 'powershell.exe'
     $kernelMsiUrl = 'https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi'
     $rootfsUrl = 'https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz'
     $kernelMsiPath = Join-Path $installRoot 'wsl_update_x64.msi'
@@ -230,6 +246,30 @@ sparseVhd=true
         throw "Failed to verify WSL distributions. See TROUBLESHOOTING.md. Details: $($_.Exception.Message)"
     }
     $verificationOutput | ForEach-Object { Write-Host $_ }
+
+    Write-Section 'Checking optional WSL localhost forwarding repair'
+    $repairScriptPath = Join-Path $scriptDirectory 'repair-wsl2-localhost-forwarding.ps1'
+    if (-not (Test-Path $repairScriptPath)) {
+        Write-Warn "Localhost forwarding repair helper was not found at $repairScriptPath. Skipping the optional repair step."
+    }
+    elseif (Test-TcpEndpoint -Address '127.0.0.1' -Port $ProxyPort) {
+        Write-Warn "Detected a Windows localhost listener on 127.0.0.1:$ProxyPort. Repairing WSL localhost forwarding now."
+        [void](Invoke-CheckedCommand `
+            -FilePath $powershellExePath `
+            -ArgumentList @(
+                '-ExecutionPolicy', 'Bypass',
+                '-File', $repairScriptPath,
+                '-DistroName', $distroName,
+                '-ListenPort', "$ProxyPort",
+                '-ConnectPort', "$ProxyPort"
+            ) `
+            -Description "Repairing WSL localhost forwarding for port $ProxyPort")
+    }
+    else {
+        Write-Warn "No Windows localhost listener is active on 127.0.0.1:$ProxyPort. Skipping the optional forwarding repair."
+        Write-Host 'If you start a Windows proxy later, run this command:' -ForegroundColor Yellow
+        Write-Host "  powershell.exe -ExecutionPolicy Bypass -File `"$repairScriptPath`" -DistroName `"$distroName`" -ListenPort $ProxyPort -ConnectPort $ProxyPort" -ForegroundColor Yellow
+    }
     Write-Success 'WSL bootstrap completed successfully.'
 }
 catch {
