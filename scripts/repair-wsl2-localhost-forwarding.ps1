@@ -34,16 +34,16 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-Section { param([string]$Message) Write-Host "`n=== $Message ===" -ForegroundColor Cyan }
-function Write-Success { param([string]$Message) Write-Host $Message -ForegroundColor Green }
-function Write-Warn { param([string]$Message) Write-Host $Message -ForegroundColor Yellow }
-function Write-Failure { param([string]$Message) Write-Host $Message -ForegroundColor Red }
+function Write-Section { param([string]$Message) Write-Information "`n=== $Message ===" -InformationAction Continue }
+function Write-Success { param([string]$Message) Write-Information $Message -InformationAction Continue }
+function Write-Warn { param([string]$Message) Write-Warning $Message }
+function Write-Failure { param([string]$Message) Write-Output $Message }
 function Exit-WithError {
     param([string]$Message, [int]$Code = 1)
     Write-Failure $Message
     exit $Code
 }
-function Normalize-Text {
+function ConvertTo-NormalizedText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return $null }
     return ($Text -replace "`r`n", "`n").Trim()
@@ -54,7 +54,7 @@ function Invoke-NativeCommand {
         $output = & $FilePath @ArgumentList 2>&1
         $exitCode = $LASTEXITCODE
         if ($AllowedExitCodes -notcontains $exitCode) {
-            $normalizedOutput = Normalize-Text (($output | Out-String))
+            $normalizedOutput = ConvertTo-NormalizedText (($output | Out-String))
             throw "$Description failed with exit code $exitCode. Output: $normalizedOutput"
         }
         return @($output)
@@ -99,7 +99,7 @@ function Get-WslHostAddress {
     try {
         $gatewayOutput = & $WslExePath -d $TargetDistro -- bash -lc "ip route show default 2>/dev/null | awk '/default/ {print \$3; exit}'" 2>$null
         if ($LASTEXITCODE -eq 0 -and $gatewayOutput) {
-            $gatewayAddress = Normalize-Text (($gatewayOutput | Select-Object -First 1) | Out-String)
+            $gatewayAddress = ConvertTo-NormalizedText (($gatewayOutput | Select-Object -First 1) | Out-String)
         }
     }
     catch {
@@ -129,7 +129,7 @@ function Get-WslHostAddress {
     }
     return $candidateAddress
 }
-function Get-PortProxyRules {
+function Get-PortProxyRuleEntry {
     param([string]$NetshPath)
     $output = Invoke-NativeCommand `
         -FilePath $NetshPath `
@@ -149,19 +149,23 @@ function Get-PortProxyRules {
     return $rules
 }
 function Remove-PortProxyRule {
+    [CmdletBinding(SupportsShouldProcess)]
     param([string]$NetshPath, [string]$ListenAddress, [int]$ListenPort)
-    [void](Invoke-NativeCommand `
-        -FilePath $NetshPath `
-        -ArgumentList @('interface', 'portproxy', 'delete', 'v4tov4', "listenport=$ListenPort", "listenaddress=$ListenAddress") `
-        -Description "Removing portproxy rule ${ListenAddress}:$ListenPort")
-    Write-Warn "Removed stale portproxy rule ${ListenAddress}:$ListenPort."
+    $target = "${ListenAddress}:$ListenPort"
+    if ($PSCmdlet.ShouldProcess($target, 'Remove portproxy rule')) {
+        [void](Invoke-NativeCommand `
+            -FilePath $NetshPath `
+            -ArgumentList @('interface', 'portproxy', 'delete', 'v4tov4', "listenport=$ListenPort", "listenaddress=$ListenAddress") `
+            -Description "Removing portproxy rule $target")
+        Write-Warn "Removed stale portproxy rule $target."
+    }
 }
-function Get-NormalizedFirewallProfiles {
-    param([AllowNull()][object]$Profile)
-    if ($null -eq $Profile) { return @() }
+function ConvertTo-NormalizedFirewallProfile {
+    param([AllowNull()][object]$ProfileScope)
+    if ($null -eq $ProfileScope) { return @() }
 
     $profiles = @()
-    foreach ($entry in $Profile.ToString().Split(',')) {
+    foreach ($entry in $ProfileScope.ToString().Split(',')) {
         $candidate = $entry.Trim()
         if (-not [string]::IsNullOrWhiteSpace($candidate)) {
             $profiles += $candidate
@@ -175,19 +179,21 @@ function Get-NormalizedFirewallProfiles {
 function Test-FirewallProfileMatch {
     param([AllowNull()][object]$ExistingProfile, [string]$DesiredProfile)
 
-    $normalizedExisting = @(Get-NormalizedFirewallProfiles -Profile $ExistingProfile)
-    $normalizedDesired = @(Get-NormalizedFirewallProfiles -Profile $DesiredProfile)
+    $normalizedExisting = @(ConvertTo-NormalizedFirewallProfile -ProfileScope $ExistingProfile)
+    $normalizedDesired = @(ConvertTo-NormalizedFirewallProfile -ProfileScope $DesiredProfile)
     if ($normalizedExisting.Count -ne $normalizedDesired.Count) {
         return $false
     }
-    foreach ($profile in $normalizedDesired) {
-        if ($normalizedExisting -notcontains $profile) {
+    foreach ($profileName in $normalizedDesired) {
+        if ($normalizedExisting -notcontains $profileName) {
             return $false
         }
     }
     return $true
 }
-function Ensure-IpHelperService {
+function Set-IpHelperServiceState {
+    [CmdletBinding(SupportsShouldProcess)]
+    param()
     try {
         $service = Get-Service -Name 'iphlpsvc' -ErrorAction Stop
     }
@@ -200,6 +206,9 @@ function Ensure-IpHelperService {
     }
     Write-Warn 'Starting the Windows IP Helper service because portproxy depends on it.'
     try {
+        if (-not $PSCmdlet.ShouldProcess('iphlpsvc', 'Start service')) {
+            return
+        }
         Start-Service -Name 'iphlpsvc'
         $service.WaitForStatus([System.ServiceProcess.ServiceControllerStatus]::Running, [TimeSpan]::FromSeconds(10))
         $service.Refresh()
@@ -212,14 +221,15 @@ function Ensure-IpHelperService {
     }
     Write-Success 'Windows IP Helper service is running.'
 }
-function Ensure-FirewallRule {
-    param([string]$DisplayName, [int]$LocalPort, [string]$Profile)
+function Set-FirewallRuleState {
+    [CmdletBinding(SupportsShouldProcess)]
+    param([string]$DisplayName, [int]$LocalPort, [string]$FirewallProfile)
     $existingRules = @(Get-NetFirewallRule -DisplayName $DisplayName -ErrorAction SilentlyContinue)
     $recreateRule = $existingRules.Count -ne 1
     if (-not $recreateRule -and $existingRules.Count -eq 1) {
         $existingRule = $existingRules[0]
         $portFilter = Get-NetFirewallPortFilter -AssociatedNetFirewallRule $existingRule | Select-Object -First 1
-        $profileMatches = Test-FirewallProfileMatch -ExistingProfile $existingRule.Profile -DesiredProfile $Profile
+        $profileMatches = Test-FirewallProfileMatch -ExistingProfile $existingRule.Profile -DesiredProfile $FirewallProfile
         if (
             $existingRule.Direction -ne 'Inbound' -or
             $existingRule.Action -ne 'Allow' -or
@@ -231,18 +241,27 @@ function Ensure-FirewallRule {
         }
     }
     if ($recreateRule -and $existingRules.Count -gt 0) {
+        if (-not $PSCmdlet.ShouldProcess($DisplayName, 'Remove existing firewall rules')) {
+            return
+        }
         $existingRules | Remove-NetFirewallRule | Out-Null
-        Write-Warn "Recreating firewall rule '$DisplayName' to match TCP $LocalPort on profile '$Profile'."
+        Write-Warn "Recreating firewall rule '$DisplayName' to match TCP $LocalPort on profile '$FirewallProfile'."
     }
     if ($recreateRule -or $existingRules.Count -eq 0) {
+        if (-not $PSCmdlet.ShouldProcess($DisplayName, "Create firewall rule for TCP $LocalPort on profile '$FirewallProfile'")) {
+            return
+        }
         New-NetFirewallRule `
             -DisplayName $DisplayName `
             -Direction Inbound `
             -LocalPort $LocalPort `
             -Protocol TCP `
             -Action Allow `
-            -Profile $Profile | Out-Null
-        Write-Success "Firewall rule '$DisplayName' allows inbound TCP $LocalPort on profile '$Profile'."
+            -Profile $FirewallProfile | Out-Null
+        Write-Success "Firewall rule '$DisplayName' allows inbound TCP $LocalPort on profile '$FirewallProfile'."
+        return
+    }
+    if (-not $PSCmdlet.ShouldProcess($DisplayName, 'Enable firewall rule')) {
         return
     }
     Enable-NetFirewallRule -DisplayName $DisplayName | Out-Null
@@ -297,7 +316,7 @@ try {
     Write-Success "${ConnectAddress}:$ConnectPort is reachable from Windows."
 
     Write-Section 'Preparing Windows networking prerequisites'
-    Ensure-IpHelperService
+    Set-IpHelperServiceState
 
     Write-Section 'Detecting current WSL host address'
     $listenAddress = Get-WslHostAddress -WslExePath $wslExePath -TargetDistro $DistroName
@@ -305,7 +324,7 @@ try {
 
     Write-Section 'Reconciling portproxy rule'
     $firewallProfile = 'Any'
-    $rules = Get-PortProxyRules -NetshPath $netshPath
+    $rules = Get-PortProxyRuleEntry -NetshPath $netshPath
     $exactRule = $rules | Where-Object {
         $_.ListenAddress -eq $listenAddress -and
         $_.ListenPort -eq $ListenPort -and
@@ -342,10 +361,10 @@ try {
     }
 
     Write-Section 'Reconciling firewall rule'
-    Ensure-FirewallRule -DisplayName $FirewallRuleName -LocalPort $ListenPort -Profile $firewallProfile
+    Set-FirewallRuleState -DisplayName $FirewallRuleName -LocalPort $ListenPort -FirewallProfile $firewallProfile
 
     Write-Section 'Verifying from WSL'
-    $finalRule = Get-PortProxyRules -NetshPath $netshPath | Where-Object {
+    $finalRule = Get-PortProxyRuleEntry -NetshPath $netshPath | Where-Object {
         $_.ListenAddress -eq $listenAddress -and
         $_.ListenPort -eq $ListenPort -and
         $_.ConnectAddress -eq $ConnectAddress -and
@@ -358,7 +377,7 @@ try {
         throw "WSL still could not reach ${listenAddress}:$ListenPort after repair. Recheck your Windows proxy process and local firewall rules."
     }
     Write-Success "WSL can reach ${listenAddress}:$ListenPort."
-    Write-Host ("{0}:{1} -> {2}:{3}" -f $finalRule.ListenAddress, $finalRule.ListenPort, $finalRule.ConnectAddress, $finalRule.ConnectPort)
+    Write-Output ("{0}:{1} -> {2}:{3}" -f $finalRule.ListenAddress, $finalRule.ListenPort, $finalRule.ConnectAddress, $finalRule.ConnectPort)
     Write-Success 'WSL localhost forwarding repair completed successfully.'
 }
 catch {
