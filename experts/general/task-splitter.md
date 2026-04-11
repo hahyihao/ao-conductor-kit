@@ -118,6 +118,20 @@ One issue per brief, created with `gh issue create --body-file <brief>`. Record 
 `HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn <ids...>` from the project root.
 Record the worker session names back into the plan document.
 
+### 4.5 Dispatch verification is mandatory
+`ao send` returning does NOT by itself mean the target worker actually started running the brief. For every dispatch sent into a live session, completion is only real after you verify execution started.
+
+Run this sequence as one atomic protocol immediately after each `ao send <session> "<brief>"`:
+
+1. Wait 10 seconds.
+2. Check for a real working signal first using AO-visible state, such as `ao status` or the session view. If the session is clearly running, dispatch is complete.
+3. If AO state is still ambiguous and the session is tmux-backed, capture the target pane with `tmux capture-pane -pt <session>:0` and inspect whether the brief is sitting in the input box unsent or whether a `Working` signal has already appeared.
+4. Only when pane capture proves the known F7 state, meaning the brief was pasted into the input box but not submitted, you may send one raw recovery keypress with `tmux send-keys -t <session>:0 Enter`.
+5. Wait 5 seconds and verify again that a `Working` signal appeared.
+6. If `Working` is still absent, record an F7 incident, retry the original `ao send` once, and repeat the same verification sequence once. If the second pass still fails, stop and escalate to CEO.
+
+This is a narrow exception to the normal "do not use raw `tmux send-keys`" rule. `ao send` remains the primary dispatch path because it preserves AO routing and busy detection. The raw tmux fallback is allowed only to submit an already-verified stuck input line for the known F7 bug, never as a general dispatch shortcut.
+
 ---
 
 ## 5. Pre-dispatch checklist (run every time)
@@ -174,6 +188,7 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 ## 9. Failure handling
 
 - **Worker stalls (no git activity for > 10 min)**: `ao send <worker> "status?"`. If no response in 2 min, escalate to CEO.
+- **F7 dispatch incident (brief pasted but not submitted)**: run the mandatory verification flow in §4.5. If one verified `Enter` recovery plus one full `ao send` retry still does not produce `Working`, stop dispatch and escalate to CEO with the affected session name and proof.
 - **CI fails repeatedly (> 3 times on same PR)**: stop the self-heal loop, escalate to CEO with the error summary.
 - **Expert scout cannot find a source for a requested domain**: mark the discovery-queue entry as `blocked`, escalate to CEO with a human-readable explanation of what is needed.
 - **Architect produces conflicting ADRs**: escalate to CEO, do not pick one yourself.
@@ -261,3 +276,16 @@ You MUST ask for this bundle in the brief and MUST treat missing evidence as a f
 Any substantive rework after review MUST go through review again. A prior reviewer verdict MUST NOT carry forward automatically once the implementation has materially changed. PM and implementer alike MUST NOT skip re-review on the theory that the patch is "small", "just a fixup", or "only a follow-up tweak".
 
 This addendum defines no whitelist exception. Substantive rework always REQUIRES re-review before the task can be treated as approved again.
+
+---
+
+## 15. Idle-time backlog greedy pull
+
+When your current dispatch has drained and no new CEO goal is pending, you do not sit idle. If worker capacity is below the active cap, proactively pull the next ready backlog item and dispatch it.
+
+1. **Trigger.** Enter idle backlog pull only when all spawned workers are PR-ready or exited, no new CEO goal is pending, and free worker capacity remains.
+2. **Scan order.** Scan backlog sources in this order: `ROADMAP.md` `⏸ 待办`, `experts/discovery-queue.md`, parked issues whose blocking dependency is now resolved, then lifecycle feedback from recently completed work.
+3. **Priority rule.** Prefer items that are dependency-clear first, then higher priority, then smaller scope. If an item still needs a missing expert, an unresolved dependency, or a CEO decision, skip it and continue scanning.
+4. **Cooldown.** Wait at least 30 seconds between idle pulls. Re-check the candidate immediately before dispatch so parallel PMs do not race the same backlog item.
+5. **Stop conditions.** Stop when worker capacity is full, the backlog scan returns no ready item, or a new CEO goal arrives. CEO input always preempts backlog pull.
+6. **Record.** Write every idle-time pull into the plan document, including the backlog source and why the item became eligible now.
