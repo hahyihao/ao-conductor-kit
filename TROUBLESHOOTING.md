@@ -20,6 +20,9 @@ AO 初装故障排查记录
 - [Issue 8：没有安装 `gh` 时 `ao spawn` 直接拒绝启动](#issue-8没有安装-gh-时-ao-spawn-直接拒绝启动)
 - [Issue 9：Codex 直连测试 `/responses` 返回 200 但没有输出内容](#issue-9codex-直连测试-responses-返回-200-但没有输出内容)
 - [Issue 10：Codex 提示 `bubblewrap on PATH not found`](#issue-10codex-提示-bubblewrap-on-path-not-found)
+- [Issue 11：tmux 3.2a segfault 导致所有 codex TUI session 神秘死亡](#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)
+- [Issue 12：ao session kill 不清 worktree，新 worker 因 git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
+- [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
 
@@ -449,6 +452,151 @@ sudo apt-get install -y bubblewrap
 做环境巡检时，优先关注命令是否真正失败，而不是先被 cosmetic warning 带偏。
 团队文档里应明确说明：有 vendored bubblewrap 时，这条提示本身不代表坏了。
 只有当 sandbox 功能实际报错或命令被拒绝执行时，才需要把它升级为必须处理的问题。
+
+## Issue 11：tmux 3.2a segfault 导致所有 codex TUI session 神秘死亡
+
+### 现象
+
+在 Ubuntu 22.04 WSL2 里，每次 `ao start` 或 `ao batch-spawn` 之后：
+
+- orchestrator 或 worker session 被创建，`ao status` 一开始正常
+- tmux 进程和 codex 进程都能用 `ps` 看到
+- 过 17 秒到 60 秒不等，所有 codex 进程消失
+- `ao session ls -a` 把对应 session 标记成 `[killed]` 或 `[exited]`
+- 没有任何应用层错误信息，lifecycle-worker.log 干净，codex session log 里最后一条只是普通的 `reasoning` 或 `function_call_output`，然后就截断
+- 反复 `ao stop && ao start` 无效，换 orchestrator 类型也无效
+- 这不是一次性现象：单次会话里至少出现 7 次，每次都和前一次表现一致
+
+多次错误的猜测都会把人带偏到配置层面（tmux 尺寸、codex alt screen、AGENTS.md、WSL 网络），但真正的线索藏在 `dmesg` 里。
+
+### 根因
+
+**Ubuntu 22.04 自带的 tmux 3.2a (`3.2a-4ubuntu0.2`) 有一个 NULL 指针 segfault bug**。只要在 detached 会话里运行 codex TUI 并让它调用 shell tool 处理一些文件操作，tmux server 就会在大约 17 秒后收到一个 SIGSEGV 并整体崩溃。一旦 tmux server 崩溃，它上面挂着的所有 pane（包括 codex TUI）都会被一起回收。
+
+真正的证据只有一条：在 WSL 里运行 `dmesg`，会看到 tmux server 的 segfault 记录：
+
+```
+[  120.327861] tmux: server[232]: segfault at 0 ip 000055b4552b2d80 sp 00007ffc06584030 error 4 in tmux[55b455280000+97000]
+[  209.926840] tmux: server[739]: segfault at 0 ip 0000556416bb0d80 sp 00007ffc4a88f230 error 4 in tmux[556416b7e000+97000]
+```
+
+两次 `ip` 地址都指向 tmux 二进制内部的同一个指令区域，偏移是 `mov [rax]` 指令，也就是经典的 NULL 解引用。
+
+同一条 bug 在 tmux 3.3 之后的版本里已经修复。Ubuntu 22.04 的 `jammy-updates` 和 `jammy-backports` 都不提供更新的 tmux，所以 apt 这条路是死路，只能从源码构建，或用新系统版本。
+
+### 修复
+
+**从源码构建 tmux 3.5a 并替换系统二进制**：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libevent-dev libncurses5-dev pkg-config automake autoconf bison
+
+cd /tmp
+curl -sSL -o tmux-3.5a.tar.gz https://github.com/tmux/tmux/releases/download/3.5a/tmux-3.5a.tar.gz
+tar xf tmux-3.5a.tar.gz
+cd tmux-3.5a
+./configure --prefix=/usr/local
+make -j"$(nproc)"
+sudo make install
+
+# 备份旧的，然后 symlink 替换
+sudo mv /usr/bin/tmux /usr/bin/tmux.3.2a.backup
+sudo ln -sf /usr/local/bin/tmux /usr/bin/tmux
+
+tmux -V   # 必须显示 "tmux 3.5a"
+```
+
+执行完之后，所有已经死掉的 orchestrator 和 worker session 都要清理一次再重建：
+
+```bash
+cd /root/projects/<your-project>
+ao stop 2>/dev/null
+rm -rf /root/.worktrees/<project-slug>/*
+git worktree prune
+rm -f /root/.agent-orchestrator/*/lifecycle-worker.pid
+ao start
+```
+
+然后再 `ao spawn` 或 `ao batch-spawn` 出来的 session 就会长时间稳定运行。
+
+### 预防
+
+1. `scripts/bootstrap-ao.sh` 应该在安装完 apt 的 tmux 之后，立刻执行上面的源码升级步骤，而不是依赖 apt 版本。
+2. 任何 `ao doctor` 或启动脚本都应该在启动前检查 `tmux -V` 是否大于 3.3，不够就拒绝启动并提示升级。
+3. 在 README 里显式写明："Ubuntu 22.04 的 apt tmux 不可用"。
+4. 任何 "session 无故 exit/killed" 的诊断流程，第一步都要先 `dmesg 2>&1 | grep -i "tmux\|segfault\|oom"`，不要先看应用层日志。
+
+## Issue 12：ao session kill 不清 worktree，新 worker 因 git checkout 冲突立刻 exit
+
+### 现象
+
+在解决 Issue 11 之前，我们曾经把 worker 的频繁死亡误判成"worker 完成任务后 exited"。但实际上 `ao session kill` 之后再尝试 `ao spawn <same-issue>` 会瞬间 exit，没有任何输出。用 `ao spawn --no-wait` 加 verbose 才捕获到真实错误：
+
+```
+✗ Failed to create or initialize session
+✗ Failed to checkout branch "feat/issue-4" in worktree: Command failed: git checkout feat/issue-4
+fatal: 'feat/issue-4' is already checked out at '/root/.worktrees/ao-kit/kit-7'
+```
+
+### 根因
+
+这是 AO 的开放 issue [#1129 "ao stop doesn't kill child agent sessions spawned by orchestrator"](https://github.com/ComposioHQ/agent-orchestrator/issues/1129) 的变种。`ao session kill <name>` 虽然把 AO 数据库里的 session 记录删掉了，但：
+
+- 不调用 `git worktree remove` 清理磁盘上的 worktree
+- 不调用 `git branch -D` 删除对应的 feature 分支
+- 不清理 `/root/.agent-orchestrator/<project>/sessions/<session>` 里的日志和状态
+
+于是下一次尝试 `ao spawn` 到同一个 issue（分支自动派生自 issue 编号）时，git 看到这个分支已经被一个 worktree 占用了，就拒绝再次 checkout，worker 立刻以错误退出。
+
+这在一次尝试里可能只影响一个 session，但如果你连续 `ao session kill` 很多次再重试，磁盘上会留下多个"看得见但占坑"的 worktree，让后续 spawn 全部失败。
+
+### 修复
+
+清理前一次的 worktree，再让 git 清理自己的记账：
+
+```bash
+cd /root/projects/<your-project>
+
+# 1. 物理清理 worktree 目录（注意别在路径里犯变量为空的错）
+rm -rf /root/.worktrees/<project-slug>/kit-*
+
+# 2. 让 git 同步它的 worktree 索引
+git worktree prune
+git worktree list      # 应该只剩主 worktree
+
+# 3. 删除残留的 feature 分支（可选但推荐）
+git branch --list 'feat/*' | xargs -r git branch -D
+```
+
+完成之后再 `ao spawn` 或 `ao batch-spawn` 就不会再因为重复 checkout 失败。
+
+### 预防
+
+1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次上面的清理流程。
+2. 在母盘里提供一个 `tools/prune-worktrees.sh` 脚本，把清理步骤固化下来。
+3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
+4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
+
+## 误诊链路（历史记录）
+
+Issue 11 的 tmux segfault 是整个安装过程最难排查的一个坑，最终耗掉了几个小时。以下是在确认真因之前，这次会话曾经认真尝试过、但最终证明并非根因的假设，按时间顺序记录，目的是让下一个遇到同类症状的人**不要重复走这些弯路**。
+
+1. **假设："tmux 出现 `131072x1 screen size is bogus` 警告说明 tmux 分配了错误尺寸，导致 codex TUI 画面崩溃"。** 修复动作：写 `~/.tmux.conf` 加上 `set-option -g default-size 200x50`，同时在启动前 `export COLUMNS=200 LINES=50`。结果：session 存活时间从 5–15 秒延长到 17–40 秒左右，但依然会死。**结论**：symptom 被延后，根因没动。
+
+2. **假设："codex TUI 的 alt screen 模式在 detached tmux 里不兼容"。** 修复动作：在 `/root/.codex/config.toml` 里加 `no_alt_screen = true`，并验证 `codex exec` 也走同一个配置路径。结果：`codex exec` 始终正常，TUI session 依然在同样时间点死。**结论**：alt screen 不是根因，但这条配置本身没坏处，可以保留。
+
+3. **假设："项目根目录下的 `AGENTS.md` 有某段内容触发了 codex 的 startup skills 加载失败，类似 codex 上游 issue #16914"。** 修复动作：`git rm AGENTS.md`，commit，push 到 main，等新的 orchestrator worktree 自然拿到无 AGENTS.md 的版本。结果：新 session 同样死。**结论**：AGENTS.md 不参与根因。
+
+4. **假设："WSL2 init 的 `StartHostListener:356: write failed 32`(EPIPE) 错误累积，导致 PTY 分配损坏"。** 修复动作：`wsl --shutdown` 然后重启整个 WSL 发行版，同时重建 `netsh portproxy`。结果：dmesg 里确实干净了几分钟，但新 tmux 启动后过一会还是会出现 tmux segfault（见 Issue 11 的真正证据）。**结论**：EPIPE 确实存在，但不是根因；它更像是下游症状。
+
+5. **假设："workers 的 `exited` 状态意味着任务完成后正常退出"。** 这个误判让我们一度以为 worker 已经干完活，PR 只是被 `git push` 卡住没上来。真相：完全没有 PR，worktree 里也没有新文件。这条假设最大的代价是**把诊断方向从基础设施层拖回应用层**。**结论**：看到 `exited` 要先验证磁盘上的产出，不要默认它等于"完成"。
+
+6. **假设："CEO 直接 batch-spawn 绕开 orchestrator 就能跑通"。** 结果：绕开 orchestrator 之后，worker 一样在 20 秒内死光。这一步反而证明了问题不在 orchestrator 层，而在更底层的 tmux。这是本次诊断的关键转折点。**结论**：当 worker 和 orchestrator 同时出问题时，**永远先查它们的共同依赖**（tmux / WSL / 内核）。
+
+7. **Issue 12 的 worktree 冲突**。在真因被找到之前，worktree 冲突让一部分 session 快速 exit 出一个 git 错误。我们把它误认成 Issue 11 的变种，花了一些时间在上面。最后证明它只是同时出现的另一个独立 bug，修掉之后 session 的存活时间指标并没有改善。**结论**：多 bug 共存时，要能把"每一条死因"逐项划勾。
+
+最后定位到 tmux 3.2a segfault 的线索，是一次对 `dmesg` 的例行检查。**这个教训被提炼成 Issue 11 的预防条目**：任何"session 无故死"的诊断流程，第一步都必须先看 dmesg。
 
 ## 调试技巧
 
