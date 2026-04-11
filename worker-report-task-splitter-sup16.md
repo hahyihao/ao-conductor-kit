@@ -26,4 +26,4 @@
 
 ## PR link
 
-- Pending PR creation
+- https://github.com/hahyihao/ao-conductor-kit/pull/68
