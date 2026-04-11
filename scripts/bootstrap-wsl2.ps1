@@ -2,35 +2,49 @@
 .PURPOSE
 Bootstrap WSL2 and Ubuntu 22.04 on Windows 10 21H1 for the AO Conductor Kit.
 .AUTHOR
-hahyihao (with AO-orchestrated Codex worker, 2026-04-11)
+hahyihao (with AO-orchestrated Codex worker, 2026-04-12)
 .DATE
-2026-04-11
+2026-04-12
 .TESTED ENVIRONMENT
 Windows 10 Pro 21H1 build 19043
 .USAGE
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1 -InstallPath "D:\WSL"
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\bootstrap-wsl2.ps1 -ProxyPort 8888
 #>
 [CmdletBinding()]
 param(
     [Parameter()]
-    [string]$InstallPath = 'D:\WSL'
+    [string]$InstallPath = 'D:\WSL',
+
+    [Parameter()]
+    [ValidateRange(1, 65535)]
+    [int]$ProxyPort = 7897
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-function Write-Section { param([string]$Message) Write-Host "`n=== $Message ===" -ForegroundColor Cyan }
-function Write-Success { param([string]$Message) Write-Host $Message -ForegroundColor Green }
-function Write-Warn { param([string]$Message) Write-Host $Message -ForegroundColor Yellow }
-function Write-Failure { param([string]$Message) Write-Host $Message -ForegroundColor Red }
+function Write-Section { param([string]$Message) Write-Information "`n=== $Message ===" -InformationAction Continue }
+function Write-Success { param([string]$Message) Write-Information $Message -InformationAction Continue }
+function Write-Warn { param([string]$Message) Write-Warning $Message }
+function Write-Failure { param([string]$Message) Write-Output $Message }
 function Exit-WithError {
     param([string]$Message, [int]$Code = 1)
     Write-Failure $Message
     exit $Code
 }
-function Normalize-Text {
+function ConvertTo-NormalizedText {
     param([AllowNull()][string]$Text)
     if ($null -eq $Text) { return $null }
     return ($Text -replace "`r`n", "`n").Trim()
+}
+function Test-TcpEndpoint {
+    param([string]$Address, [int]$Port)
+    try {
+        return [bool](Test-NetConnection -ComputerName $Address -Port $Port -WarningAction SilentlyContinue -InformationLevel Quiet)
+    }
+    catch {
+        return $false
+    }
 }
 function Invoke-CheckedCommand {
     param([string]$FilePath, [string[]]$ArgumentList, [string]$Description, [int[]]$AllowedExitCodes = @(0))
@@ -45,7 +59,7 @@ function Invoke-CheckedCommand {
         throw "$Description failed. See TROUBLESHOOTING.md. Details: $($_.Exception.Message)"
     }
 }
-function Download-File {
+function Invoke-FileDownload {
     param([string]$Uri, [string]$OutFile, [string]$Label)
     if (Test-Path $OutFile) {
         Write-Warn "$Label already exists at $OutFile. Skipping download."
@@ -59,11 +73,11 @@ function Download-File {
         throw "Failed to download $Label from $Uri. See TROUBLESHOOTING.md. Details: $($_.Exception.Message)"
     }
 }
-function Prompt-RebootAndExit {
+function Invoke-RebootPromptAndExit {
     param([string]$ResumeCommand)
     Write-Warn 'A reboot is required before WSL2 setup can continue.'
-    Write-Host 'Run this command after reboot:' -ForegroundColor Yellow
-    Write-Host "  $ResumeCommand" -ForegroundColor Yellow
+    Write-Warn 'Run this command after reboot:'
+    Write-Output "  $ResumeCommand"
     [void](Read-Host 'Press Enter to exit cleanly, reboot Windows, and rerun the command above')
     exit 0
 }
@@ -83,9 +97,11 @@ try {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $installRoot = $InstallPath
     $scriptPath = $MyInvocation.MyCommand.Path
-    $resumeCommand = 'powershell.exe -ExecutionPolicy Bypass -File "{0}" -InstallPath "{1}"' -f $scriptPath, $installRoot
+    $scriptDirectory = Split-Path -Parent $scriptPath
+    $resumeCommand = 'powershell.exe -ExecutionPolicy Bypass -File "{0}" -InstallPath "{1}" -ProxyPort {2}' -f $scriptPath, $installRoot, $ProxyPort
     $dismPath = Join-Path $env:WINDIR 'System32\dism.exe'
     $wslExePath = Join-Path $env:WINDIR 'System32\wsl.exe'
+    $powershellExePath = Join-Path $PSHOME 'powershell.exe'
     $kernelMsiUrl = 'https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi'
     $rootfsUrl = 'https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz'
     $kernelMsiPath = Join-Path $installRoot 'wsl_update_x64.msi'
@@ -107,7 +123,7 @@ try {
         }
     }
     if ($featureStates.Values | Where-Object { $_.State -eq 'Enable Pending' }) {
-        Prompt-RebootAndExit -ResumeCommand $resumeCommand
+        Invoke-RebootPromptAndExit -ResumeCommand $resumeCommand
     }
     $rebootRequired = $false
     foreach ($featureName in $featureNames) {
@@ -135,7 +151,7 @@ try {
         }
     }
     if ($rebootRequired) {
-        Prompt-RebootAndExit -ResumeCommand $resumeCommand
+        Invoke-RebootPromptAndExit -ResumeCommand $resumeCommand
     }
     if (-not (Test-Path $wslExePath)) {
         Exit-WithError "wsl.exe was not found at $wslExePath after feature enablement. Reboot Windows and rerun this script. See TROUBLESHOOTING.md."
@@ -153,7 +169,7 @@ try {
         Write-Success 'WSL2 kernel package already appears to be installed.'
     }
     else {
-        Download-File -Uri $kernelMsiUrl -OutFile $kernelMsiPath -Label 'WSL2 kernel MSI'
+        Invoke-FileDownload -Uri $kernelMsiUrl -OutFile $kernelMsiPath -Label 'WSL2 kernel MSI'
         Write-Warn 'Installing WSL2 kernel MSI silently.'
         [void](Invoke-CheckedCommand `
             -FilePath 'msiexec.exe' `
@@ -185,7 +201,7 @@ try {
         Write-Success 'Ubuntu-22.04 is already imported.'
     }
     else {
-        Download-File -Uri $rootfsUrl -OutFile $rootfsPath -Label 'Ubuntu 22.04 rootfs'
+        Invoke-FileDownload -Uri $rootfsUrl -OutFile $rootfsPath -Label 'Ubuntu 22.04 rootfs'
         Write-Warn "Importing $distroName as WSL2 into $distroPath."
         [void](Invoke-CheckedCommand `
             -FilePath $wslExePath `
@@ -207,7 +223,7 @@ sparseVhd=true
 '@
     $existingWslConfig = $null
     if (Test-Path $wslConfigPath) { $existingWslConfig = Get-Content -Path $wslConfigPath -Raw }
-    if ((Normalize-Text $existingWslConfig) -eq (Normalize-Text $desiredWslConfig)) {
+    if ((ConvertTo-NormalizedText $existingWslConfig) -eq (ConvertTo-NormalizedText $desiredWslConfig)) {
         Write-Success "$wslConfigPath is already up to date."
     }
     else {
@@ -229,7 +245,31 @@ sparseVhd=true
     catch {
         throw "Failed to verify WSL distributions. See TROUBLESHOOTING.md. Details: $($_.Exception.Message)"
     }
-    $verificationOutput | ForEach-Object { Write-Host $_ }
+    $verificationOutput | ForEach-Object { Write-Output $_ }
+
+    Write-Section 'Checking optional WSL localhost forwarding repair'
+    $repairScriptPath = Join-Path $scriptDirectory 'repair-wsl2-localhost-forwarding.ps1'
+    if (-not (Test-Path $repairScriptPath)) {
+        Write-Warn "Localhost forwarding repair helper was not found at $repairScriptPath. Skipping the optional repair step."
+    }
+    elseif (Test-TcpEndpoint -Address '127.0.0.1' -Port $ProxyPort) {
+        Write-Warn "Detected a Windows localhost listener on 127.0.0.1:$ProxyPort. Repairing WSL localhost forwarding now."
+        [void](Invoke-CheckedCommand `
+            -FilePath $powershellExePath `
+            -ArgumentList @(
+                '-ExecutionPolicy', 'Bypass',
+                '-File', $repairScriptPath,
+                '-DistroName', $distroName,
+                '-ListenPort', "$ProxyPort",
+                '-ConnectPort', "$ProxyPort"
+            ) `
+            -Description "Repairing WSL localhost forwarding for port $ProxyPort")
+    }
+    else {
+        Write-Warn "No Windows localhost listener is active on 127.0.0.1:$ProxyPort. Skipping the optional forwarding repair."
+        Write-Warn 'If you start a Windows proxy later, run this command:'
+        Write-Output "  powershell.exe -ExecutionPolicy Bypass -File `"$repairScriptPath`" -DistroName `"$distroName`" -ListenPort $ProxyPort -ConnectPort $ProxyPort"
+    }
     Write-Success 'WSL bootstrap completed successfully.'
 }
 catch {

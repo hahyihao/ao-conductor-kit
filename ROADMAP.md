@@ -81,7 +81,7 @@ kit-18  feat/issue-8  working  ← issue #8  code-reviewer.md
 |---|---|---|---|---|
 | 1 | tmux 3.2a segfault | ~~阻塞所有 codex TUI session~~ | 🔴 | ✅ **已修复**（源码 3.5a） |
 | 2 | orchestrator prompt 里 PATH 有 Windows 路径污染 | 警告但不影响功能 | 🟡 | 未修，低优先 |
-| 3 | WSL2 localhost forwarding 偶尔失效 | 需要 netsh portproxy workaround | 🟡 | 已绕行，永久方案待定 |
+| 3 | WSL2 localhost forwarding 偶尔失效 | 代理/推送链路偶发断开 | ✅ | 已修复：`repair-wsl2-localhost-forwarding.ps1` 自愈修复 `portproxy` 漂移 |
 | 4 | 旧 orchestrator session `[killed]` 残留在 ao status | 界面乱，不影响功能 | 🟢 | 未清，等 library-maintainer 类似机制处理 |
 | 5 | `ao session kill` 不清 worktree (Issue 12) | 后续 spawn 冲突 | 🟠 | 已文档化，workaround 是手动 rm + git worktree prune |
 | 6 | `bootstrap-ao.sh` 用 apt tmux | 新机器按 v0.2 脚本装会重复踩 Issue 11 | 🔴 | Round 1 完成后第一件要改的事 |

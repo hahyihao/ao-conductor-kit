@@ -263,32 +263,31 @@ GitHub 域名在 Clash 视角下会得到 fake IP。
 ### 修复
 
 这次修复分成 Windows 和 WSL 两段。
-第一段是在 Windows 管理员 PowerShell 中，把 Clash 代理端口显式暴露给 WSL 网关，并放通防火墙。
-本次安装里的网关地址是 `172.17.224.1`，命令如下。
+第一段是在 Windows 管理员 PowerShell 中，运行仓库里的自愈脚本，让它自动探测当前 WSL 面向 Windows 的主机 IP、修复 `portproxy`，并补齐防火墙规则。命令如下。
 
 ```powershell
-netsh interface portproxy add v4tov4 listenport=7897 listenaddress=172.17.224.1 connectport=7897 connectaddress=127.0.0.1
-New-NetFirewallRule -DisplayName "WSL Clash Proxy 7897" -Direction Inbound -LocalPort 7897 -Protocol TCP -Action Allow
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\repair-wsl2-localhost-forwarding.ps1 -DistroName Ubuntu-22.04 -ListenPort 7897 -ConnectPort 7897
 ```
 
-第二段是在 WSL 里同时配置 git 代理，并在实际 push 命令前显式导出环境变量。
+第二段是在 WSL 里先动态取当前 Windows host IP，再同时配置 git 代理，并在实际 push 命令前显式导出环境变量。
 单写 `git config` 对大推送并不总是可靠，这次真正稳定的是“配置加环境变量”一起用。
 
 ```bash
-git config --global http.proxy http://172.17.224.1:7897
-git config --global https.proxy http://172.17.224.1:7897
-HTTPS_PROXY=http://172.17.224.1:7897 git push -u origin main
+WSL_HOST_IP=$(ip route show default | awk '/default/ {print $3; exit}')
+git config --global http.proxy "http://${WSL_HOST_IP}:7897"
+git config --global https.proxy "http://${WSL_HOST_IP}:7897"
+HTTPS_PROXY="http://${WSL_HOST_IP}:7897" git push -u origin main
 ```
 
 修完之后，`git push` 不再挂死，而是能正常与 GitHub 完成认证和上传阶段交互。
 
 ### 预防
 
-如果仓库中提供了 `scripts/setup-clash-proxy.ps1` 和 `scripts/setup-git-proxy.sh`，优先跑脚本，不要手敲端口转发。
+如果仓库中提供了 `scripts/repair-wsl2-localhost-forwarding.ps1`，优先跑脚本，不要手敲 `netsh interface portproxy`。
 在 WSL 里看到目标地址解析到 `198.18.x.x` 时，先怀疑 fake-ip 路由，而不是先怀疑 GitHub。
 测试代理时不要只跑 `curl`，还要跑一次真实的 `git ls-remote` 或小型 `git push`。
 长期上传流量如果必须穿过 Windows 代理，最好显式指定 `HTTPS_PROXY`，不要完全依赖自动发现。
-换网段或重装 WSL 后，记得复查 WSL 网关地址是否变化，旧的 `portproxy` 绑定未必还能用。
+换网段、重装 WSL 或 WSL 网关变化后，直接重跑 `repair-wsl2-localhost-forwarding.ps1`，不要复用旧的静态 IP。
 
 ## Issue 7：代理修好后 `git push` 仍然返回 401
 
