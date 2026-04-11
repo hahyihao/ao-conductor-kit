@@ -22,12 +22,42 @@ pass() { printf '\033[1;32mok\033[0m   %s\n' "$1"; }
 fail() { printf '\033[1;31mfail\033[0m %s\n' "$1"; FAIL=$((FAIL+1)); }
 note() { printf '\033[0;37m       %s\033[0m\n' "$1"; }
 
+TMUX_MIN_VERSION=3.3
+
 check_cmd() {
   local cmd=$1 label=$2
   if command -v "$cmd" >/dev/null 2>&1; then
     pass "$label found at $(command -v "$cmd")"
   else
     fail "$label ($cmd) not on PATH"
+  fi
+}
+
+normalize_tmux_version() {
+  printf '%s\n' "$1" | sed -E 's/^[^0-9]*//'
+}
+
+check_tmux_version() {
+  local raw_version normalized_version
+
+  if ! command -v tmux >/dev/null 2>&1; then
+    return
+  fi
+
+  raw_version="$(tmux -V 2>/dev/null | awk '{print $2}')"
+  normalized_version="$(normalize_tmux_version "$raw_version")"
+
+  if [ -z "$normalized_version" ]; then
+    fail "tmux version could not be parsed from '$(tmux -V 2>/dev/null)'"
+    note "See TROUBLESHOOTING.md Issue 11 before using detached AO/Codex sessions."
+    return
+  fi
+
+  if dpkg --compare-versions "$normalized_version" ge "$TMUX_MIN_VERSION"; then
+    pass "tmux version ${raw_version} meets detached-session minimum (>= ${TMUX_MIN_VERSION})"
+  else
+    fail "tmux version ${raw_version} is too old; Ubuntu 22.04 apt tmux is unsafe for detached AO/Codex sessions"
+    note "See TROUBLESHOOTING.md Issue 11 and rerun scripts/bootstrap-ao.sh until tmux -V reports ${TMUX_MIN_VERSION}+."
   fi
 }
 
@@ -45,6 +75,7 @@ echo
 echo "=== 2. Linux toolchain ==="
 check_cmd git         "git"
 check_cmd tmux        "tmux"
+check_tmux_version
 check_cmd node        "Node.js"
 check_cmd npm         "npm"
 check_cmd pnpm        "pnpm"
