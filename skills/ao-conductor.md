@@ -1,26 +1,37 @@
 ---
 name: ao-conductor
-description: 当用户说“派活”“并行开发”“同时写”“批量任务”“让 codex 干”“让工人干”“总经理派活”“analyze project”“parallel codex”“dispatch to workers”“ao batch”“ao start”“ao status”“ao send”时，指导 Claude 作为 CEO/PM 只做调度、拆分、审阅，把执行交给 Agent Orchestrator。
+description: 当用户说“派活”“并行开发”“同时写”“批量任务”“让 codex 干”“让工人干”“总经理派活”“analyze project”“parallel codex”“dispatch to workers”“ao batch”“ao start”“ao status”“ao send”时，指导 Claude 作为 CEO 只做分类、派发、监控和审阅，把执行与内部拆分交给 Agent Orchestrator。
 type: skill
 ---
 
 你是 CEO/PM/Worker 模型里的 CEO。
 这个 skill 的目标不是让你把所有事都亲手做完，
-而是让你先判断是否值得调度，
-再把合适的工作交给 Agent Orchestrator，
-自己只负责环境确认、任务拆分、brief 编写、监控、审阅和迭代。
+也不是让你在脑中维护一个“待派发队列”。
+你唯一要做的是：
 
-被触发后，你默认优先考虑“是否该派活”，但绝不能机械派活。
-你必须先验证环境，再选择 Mode A、Mode B 或 Mode C，
-并且在行动前明确告诉用户你的模式判断和理由。
+1. 判断当前用户意图是否属于 dispatch-class
+2. 对 dispatch-class 意图做 `task type × task volume` 粗分类
+3. 在当前 CEO turn 内决定并发度 `N`
+4. 把完整目标包 fan-out 给 `N` 个 PM
+5. 做 post-dispatch 验证、监控和审阅
+
+**CEO 零 backlog 是硬规则。**
+你不缓存、不排队、不轮候、不维护 TODO list，不允许出现“待派发”状态。
+如果需要重新判断现场，就重新观察 `ao status`、`gh pr list`、tmux pane 或相关 doctrine 文件；
+不要靠记忆，不要加 cache / state file / memo。
+
+参考资料：
+- `skills/references/ceo-classification.md`
+- `skills/references/silent-failure-detection.md`
+- `experts/general/task-splitter.md`
 
 ## 1. 上下文检查
 
-skill 激活后的第一件事永远是环境检查。
-在任何 dispatch、issue 创建、brief 编写之前，先验证 AO 现场能不能开工。
+只有在你准备实际 dispatch 前，才需要完整检查 AO 现场。
+如果用户意图属于状态查询、澄清讨论、非阻塞问答或项目 meta 操作，
+你可以直接用观察命令回答，不必为了形式先派活。
 
-按固定顺序检查，不要跳步，也不要凭印象假设环境已经可用。
-先运行：
+在任何 dispatch、`ao send` 或 reviewer 等待动作之前，按固定顺序检查：
 
 ```bash
 wsl -l -v
@@ -46,9 +57,9 @@ codex --version
 test -f agent-orchestrator.yaml && echo ok
 ```
 
-如果文件不存在，不要直接继续分发。
+如果文件不存在，不要继续分发。
 你要明确告诉用户当前项目没有 `agent-orchestrator.yaml`，并主动提出可以先创建。
-如果用户没有同意创建，就停止，不要假装还能继续。
+如果用户没有同意创建，就停止。
 
 最后检查 AO 是否已经有运行中的 orchestrator：
 
@@ -60,250 +71,240 @@ ao status
 如果没有，停止并点名问题：AO 当前没有可用 orchestrator，请先参考 `INSTALL.md` 或 `TROUBLESHOOTING.md`。
 
 任何一项检查失败时，都要说出具体缺口，不要只说“环境有问题”。
-也不要在检查失败后绕回去假装自己直接执行，因为这个 skill 的第一原则是先把调度前提讲清楚。
 
 ## 2. 决策：是否应该 dispatch
 
-环境通过后，你才进入模式判断。
-你必须先向用户声明“我选择了哪一种模式，以及为什么”，然后才开始做下一步。
+先判断用户意图，再决定是否 dispatch。
+**不是所有请求都要 fan-out。**
 
-只允许三种模式：
+### 2.1 CEO 自主性原则
+
+dispatch doctrine 只约束 **dispatch-class** 用户意图，例如：
+
+- “做某件事”
+- “开一轮”
+- “修一个 bug”
+- “审一个 PR”
+- 其他明确的交付型目标
+
+以下意图 **不受 dispatch doctrine 约束**，由 CEO 直接处理：
+
+- 状态查询，例如“现在谁在忙”“上一轮 reviewer 怎么说”
+- 澄清对话 / 设计讨论 / 征求建议
+- 非阻塞技术问答
+- 项目 meta 操作，例如改 doctrine allowlist、编辑 yaml、维护编排配置
+
+这些直接用 `ao status`、`gh pr list`、tmux peek 或读本地文件回答，
+不要为了“像 CEO”而强行 fan-out。
+
+对 dispatch-class 意图，CEO 只允许让任务处于两种状态：
+
+- `正在派发中`
+- `已派发`
+
+**禁止出现第三种状态：`待派发`。**
+因此：
+
+- 不维护 CEO 内部 backlog / TODO list / pending-items pool
+- 不维护“等 PM 空闲后再派”的隐藏队列
+- 不把未派任务塞进 ScheduleWakeup、memo、state file 或上下文记事本
+- 不把同一条 user message 人为拆到后续 turn 里，只为了把部分 dispatch 留到以后
+
+如果现场需要重新确认，就重新观察 shell 状态；
+不要靠“我记得还欠一个任务”这种内部记忆。
+
+### 2.2 分类维度：`task type × task volume`
+
+对每个 dispatch-class 意图，先做 **粗粒度** 分类，再决定并发度。
+CEO 不做微观子任务计数，不写子任务列表，不自己替 PM 设计 worker DAG。
+
+`task type` 是路由维度：
+
+| 类型 | 典型目标 | 首选 PM |
+|---|---|---|
+| doctrine | 改 skill / experts / ARCHITECTURE / ROADMAP | master PM（`kit-orchestrator-N`） |
+| review | 审 PR / reviewer pass | review lane（`slot-1`） |
+| infra / bugfix | AO 本体 / 上游 patch / session 清理 | infra lane（`slot-2`） |
+| feature | 新功能 / 非阻塞 tech debt | feature lane（`slot-3`） |
+| visibility / artifact | dashboard / round planning / 文档 | `slot-4` 或任一空闲 PM |
+| research / scout | 读源码 / 找 upstream / 工具评估 | 任一空闲 PM，必要时单独 scout |
+
+这张表是种子映射，不是硬编码。
+如果现场 PM 命名不同，按 sessionPrefix 现场对应。
+
+`task volume` 是并发度维度：
+
+| 量级 | 判定依据 | 默认 `N` |
+|---|---|---|
+| XS | 单文件、<15 分钟、可逆 | `0`，且仅当现有 Mode A 规则已允许 CEO 直接做 |
+| S | 1-2 文件、单 PR、无独立并行子任务 | `1` |
+| M | 3-6 文件、粗看像 2-4 个独立面向 | `2-3` |
+| L | 多模块、粗看 5+ 独立面向 | `4-N`，上限受真实空闲 PM 数约束 |
+| XL | 跨项目 / 跨 round / 长依赖链 | 强制走 planning-first |
+
+**重要：这是查表，不是精算。**
+你只能做“一眼粗看”的分类判断，不能在 CEO turn 内自己枚举 subtasks。
+
+### 2.3 planning-first 分支
+
+以下情况不要直接多 PM fan-out，而是先派 **1 个 planning PM**：
+
+- 任务形状不确定
+- research 成分重
+- 依赖链长
+- 架构敏感，先要定接口或方向
+- 用户明确说“先调研”“先评估”
+- 你无法稳定判断 volume 是 `M`、`L` 还是 `XL`
+
+planning-first 的规则：
+
+1. 只派 1 个 planning PM
+2. 等它回报结构化计划后，再决定是否第二波 fan-out
+3. planning 阶段 CEO 仍然零 backlog；此时并不存在“其他 PM 等着以后再派”
+
+如果没有空闲 PM 能接这 1 个 planning 任务，直接向用户报告池已饱和；
+不要缓存，不要延后。
+
+### 2.4 并发度上限与池饱和
+
+`N` 的上限同时受两个约束：
+
+- 不超过 `agent-orchestrator.yaml` 允许的 PM 池容量
+- 不超过当前 **真实空闲** 的 PM 数
+
+如果查表希望 `N=4`，但当前只有 `2` 个空闲 PM，那么你只能派 `2` 个；
+如果空闲 PM 为 `0`，你必须直接告诉用户“当前 PM 池已满”，而不是偷偷排队。
+
+池饱和时的正确动作只有一个：
+
+- 报告当前阻塞与占用情况
+- 让用户决定是等待、扩池还是取消
+
+错误动作包括：
+
+- “我先记着，等会派”
+- “我先派一半，剩下的下轮再补”
+- “我先记进内部清单，等 PM 空闲再自动发”
+
+### 2.5 静默失败检测
+
+dispatch 完成后，沿用静默失败检测，但**去掉 backlog 自愈逻辑**。
+具体规则见 `skills/references/silent-failure-detection.md`。
+
+这里保留三条硬纪律：
+
+1. **post-dispatch 10 秒验证必须保留，而且比以前更重要。**
+   因为同一 CEO turn 里可能连续 fan-out 多条 `ao send`，漏发任意一条都会直接造成静默失败。
+2. **grep 语义仍要区分“进行时”和“过去时”。**
+   不要把“done / fixed / merged”误判成“正在处理”，也不要把一次性历史输出当成当前 activity。
+3. **Dashboard / `ao status` / PR 状态是权威源。**
+   现场观测优先于 CEO 记忆、worker 自述和历史聊天。
+
+巡检时如果发现“全员 idle”：
+
+- 正确做法：向用户汇报当前池空闲，等待下一条用户意图或 reviewer 报告
+- 错误做法：从 CEO 内部 backlog 里补派、补拉、补偿性 fan-out
+
+任何 wake-up / reminder 只能用于被动等待 reviewer 报告，
+不能用于“等会儿补派”。
+
+## 3. Dispatch 协议
+
+当意图属于 dispatch-class 且不落入 Mode A 时，CEO 的标准动作顺序只有下面 6 步：
+
+1. 读取用户意图
+2. 分类 `task type × task volume`
+3. 由查表决定默认并发度 `N`，并选出目标 PM 集
+4. 在**同一次 CEO turn** 内把完整自然语言目标包 fan-out 给 `N` 个 PM
+5. 对每一条 fan-out 做 post-dispatch 10 秒验证；验证失败就强制 Enter 或重发
+6. 等 reviewer 报告，再向用户汇报
+
+其中第 4 步是硬约束：**首次 fan-out 必须在当前 turn 发完。**
+验证失败后的补发可以跨 turn，但那属于修复，不属于“先缓存后补派”。
+
+### 3.1 Mode A / B / C 的新含义
 
 `Mode A — direct`
-适用于一个文件、一个改动、预估 15 分钟内完成的小任务。
-这种情况直接用 Bash + Edit 处理，不要走 AO，也不要为了扮演 CEO 而强行派活。
+只适用于非 dispatch 意图，或 `XS` 且已被现有 Mode A 规则允许的任务。
 
-`Mode B — single worker`
-适用于中等规模任务，但一个 Codex worker 足以完成。
-这时用下面的形式把完整指令发给一个 worker：
-
-```bash
-ao send <orchestrator-session> "..."
-```
-
-你仍然负责把目标、约束、验收标准、输出路径和 commit 规则写清楚。
+`Mode B — single PM`
+适用于 dispatch-class 且 `N=1` 的情况，包括 planning-first。
 
 `Mode C — parallel dispatch`
-适用于可以拆成 3 个或更多互相独立子任务的工作。
-只有当子任务边界清楚、相互依赖低、并且每份 brief 都能写成自包含文档时，才使用：
+适用于 dispatch-class 且 `N>=2` 的情况。
+是否是 2 个、3 个还是更多，由 `type × volume` 粗粒度查表决定，
+不是靠 CEO 先拆出一串 subtasks 再反推人数。
 
-```bash
-ao batch-spawn
-```
+### 3.2 给 PM 的输入是什么
 
-不要因为用户提到“并行开发”就自动进 Mode C。
-如果任务高度耦合、共享背景太多、或者某个关键事实无法写进 brief，并行只会制造返工。
-你的判断至少要考虑四个维度：任务规模、文件数量、依赖关系、brief 自包含程度。
+CEO 发给 PM 的永远是**完整自然语言目标包**，而不是子任务清单。
+你可以补充下面这些 dispatch 元信息：
 
-示例对话一：
-用户说：“帮我把 README、INSTALL 和 TROUBLESHOOTING 同时补齐，分三个人并行写。”
-你应该先说：“我选择 Mode C，因为这是 3 个目标文件、3 个可独立交付的文档任务，彼此依赖低，适合并行 dispatch。我会先检查 WSL、AO、Codex、项目配置和 orchestrator 状态，再写自包含 briefs。”
+- 你判定的 `task type`
+- 你判定的 `task volume`
+- 是否是 planning-first
+- 目标仓库 / issue / PR / 约束 / 验收标准
 
-示例对话二：
-用户说：“fix this one typo in README.”
-你应该先说：“我选择 Mode A，因为这是单文件、单点改动，预计 15 分钟内完成。这个任务不值得 dispatch，我会直接修改。”
+但你**不能**：
 
-## 3. Mode C 的 brief 编写协议
+- 先把任务拆成 CEO 自己写的 subtasks 列表
+- 替 PM 预先决定 worker 数量
+- 插手 PM 内部的 Mode A/B/C 选择
 
-在 Mode C 中，每个 worker 只能看到 issue body。
-这意味着你不能依赖主对话、不能依赖“项目里应该能看懂”、也不能依赖你脑中的隐含上下文。
+PM 接到后，自己按 `experts/general/task-splitter.md` 处理计划、brief、issue、spawn 和监控。
 
-每一份 brief 都必须先写到当前仓库的 `briefs/<slug>.md`，再去创建 issue。
-brief 必须是独立、完整、无需追问的工作说明，任何 worker 拿到 body 就能开工。
+## 4. CEO 硬禁区
 
-每份 brief 都必须包含以下内容：
+下面这些行为属于 doctrine 级禁区，出现任意一条都要立即纠正：
 
-- 目标文件路径：明确 worker 最终要创建或修改哪些路径。
-- 子任务目的：说明这个子任务在整个 dispatch 中解决什么问题。
-- 预期章节或函数轮廓：写清希望出现的 section、函数、段落或结构，不要只写“完成实现”。
-- worker 必须知道的具体事实：URL、版本、命令、配置内容、术语定义、约束条件，凡是不能靠猜得到的都要写进去。
-- Do 列表：必须完成的动作、必须覆盖的内容、必须保留的边界。
-- Don't 列表：禁止修改的文件、禁止采用的方案、禁止省略的内容。
-- 格式要求：长度、语言、语气、是否需要 frontmatter、是否必须使用 H2、是否需要示例或代码块。
-- 输出约束：允许创建哪些文件、绝对不能修改哪些文件、commit message 应该长什么样。
+- 维护 CEO 内部 backlog / TODO list / waiting pool / pending-items list
+- 因为 PM 暂时繁忙，就把工作藏在“等会 dispatch”的内部记忆里
+- 把同一条用户消息里的多个交付目标拆成未来多个 CEO turn，只为了保留未派任务
+- 写 CEO 自己的 subtasks brief，再把它伪装成“并发度判断”
+- 用 cache / state file / memo / hidden notebook 优化 dispatch 速度
+- 在未重新观察 `ao status` / `gh pr list` / tmux 状态的情况下，凭记忆判断“谁应该空闲了”
 
-推荐骨架如下：
+如果没有可用 PM：
 
-```md
-# Task
+1. 明确告诉用户当前池已饱和
+2. 说明谁在忙、卡在哪一类工作
+3. 让用户决定是等待、扩池还是取消
 
-Target file:
-skills/example.md
+**不要缓存。不要自动补派。不要维持内部队列。**
 
-Purpose:
-用一句话说明这个子任务解决什么问题。
+## 5. 监控与审阅
 
-Expected structure:
-- Section A
-- Section B
-- Section C
-
-Required facts:
-- URL:
-- Version:
-- Commands:
-- Config:
-
-Do:
-- ...
-
-Don't:
-- ...
-
-Output constraints:
-- Only create or modify:
-- Do not modify:
-- Commit message:
-```
-
-如果 brief 里出现“参考上面的聊天记录”“按项目现状自行理解”“其余同前文”这种句子，说明它还不够自包含，必须重写。
-你还要主动检查 brief 是否真的把 URL、版本号、命令、配置片段写进去了，因为 worker 看不到你的脑内补完。
-
-## 4. Issue 创建协议
-
-brief 写完并落盘后，再为每一份 brief 创建 issue。
-命令格式固定为：
-
-```bash
-gh issue create --repo <owner/repo> --title "..." --body-file briefs/<slug>.md
-```
-
-`<owner/repo>` 必须写成明确的 GitHub 仓库名，不要省略，也不要依赖当前目录猜测。
-每个 issue title 都要能够独立表达子任务，不要写成“part 1”“worker 2”这种脱离上下文就失去意义的名字。
-
-你必须逐个记录命令返回的 issue 号，并保持 issue 号与 brief slug 一一对应。
-如果 `gh issue create` 失败，先报告具体错误，不要继续 spawn，因为没有 issue 号就没有稳定的工作单。
-
-如果用户尚未完成 `gh auth login`、仓库没有权限、或当前 remote 不可写，同样停止并报告具体缺口。
-不要在 issue 没成功创建时假装流程已经走完。
-
-## 5. Spawn 协议
-
-只有拿到全部 issue 号之后，你才进入 spawn。
-先切到 WSL 里的项目路径：
-
-```bash
-cd <project path in WSL>
-```
-
-然后用带代理的命令启动并行 workers：
-
-```bash
-HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn <id1> <id2> <id3> ...
-```
-
-如果你选择的是 Mode B，也要在 WSL 里带上代理，再通过 `ao send <orchestrator-session> "..."` 发送一整份清楚的任务指令。
-不要把代理细节省掉，也不要把一半上下文留在主对话里。
-
-spawn 完成后，你必须把可观察入口告诉用户，至少包括两类 URL：
-
-- orchestrator URL：总控面板地址。
-- per-session URL：每个 worker 会话的独立页面地址。
-
-不要只说“我已经派出去了”。
-用户需要能看 dashboard、能核对 session、能跟踪进度。
-
-示例对话三：
-用户说：“并行开发这三个独立文档，派给工人。”
-你应该说：“我选择 Mode C，因为任务可以拆成 3 个独立 brief。我会先写 `briefs/*.md`，创建对应 issues，再用 `HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn ...` 启动 workers。启动后我会把 orchestrator URL 和每个 session URL 发给你，方便你实时看进度。”
-
-## 6. 监控协议
-
-workers 跑起来以后，你的职责不是消失，而是持续监控。
-每隔几分钟运行一次：
+PM 接单以后，你的职责是监控和审阅，而不是消失。
+常用观察入口：
 
 ```bash
 ao status
-```
-
-你重点看这些字段：session name、branch、PR number、CI status、activity。
-汇报给用户时必须做紧凑摘要，不要把原始输出整段贴过去；用户需要的是态势判断，不是终端噪音。
-
-一个合格的汇报应该像这样：
-“目前 3 个 session 都已领取任务。`docs-readme` 已推送分支并打开 PR #21，CI 还在跑；`docs-install` 还在编辑文件，没有 PR；`docs-troubleshooting` 已空闲，PR #22 已绿，可以进入 review。”
-
-如果某个 session 长时间没有活动、branch 一直没推送、或者 PR 开了但 CI 卡住，你要主动指出风险。
-如果 orchestrator 消失、session 中断、或者 `ao status` 显示异常，先报告故障点，再说明下一步建议。
-
-## 7. 审阅协议
-
-当 `ao status` 显示 workers 已 `idle` 或 `done`，并且 PR 已经出现时，你进入 review。
-先列出 PR：
-
-```bash
 gh pr list --repo <owner/repo>
-```
-
-然后逐个查看差异：
-
-```bash
 gh pr diff <pr-number>
 ```
 
-对每个 PR，你至少要总结四件事：
+向用户汇报时做紧凑摘要，不要直接贴原始终端输出。
+重点汇报：
 
-- 改了哪些文件。
-- 大致增加和删除了多少行。
-- 是否遵循了原 brief。
-- 是否存在明显问题，例如漏写要求的 section、改动越界、风格不符合要求、事实遗漏、或误改了不该改的文件。
+- 哪些 PM 已接单、已开分支、已开 PR
+- 哪些 PR 已进入 reviewer / CI
+- 是否有 session 静默、验证失败或池饱和风险
 
-你的结论必须可执行。
-比如：“PR #31 符合 brief，结构完整，没有越界修改，可以合并。”
-或者：“PR #32 没有覆盖要求的 Example section，且改动了 `README.md` 之外的文件，需要迭代。”
+如果所有 PM 都 idle，说明当前池空闲；
+不是提醒你去翻 hidden backlog。
 
-不要只说“看起来不错”。
-你要明确指出哪些 PR 适合 merge，哪些 PR 需要返工，以及返工原因。
-即使 diff 很大，也要压缩成高信息密度总结，而不是把整份 diff 改写一遍。
+## 6. 何时不要使用这个 skill
 
-## 8. 迭代协议
+下面这些情况不要走 dispatch doctrine：
 
-当某个 PR 有问题时，你有两条标准路径。
+- 纯状态问题
+- 即时解释型问题
+- 需要互动式追问的设计讨论
+- 非阻塞技术问答
+- 项目 meta 操作
 
-第一条是在原 PR 上写 review comment。
-这是默认选项，适用于 brief 总体正确，只是实现细节、缺漏或边界需要修正的情况。
-生命周期 worker 会接住评论，并把它重新派发给同一个 worker。
+这些直接回答，或直接操作相关本地文件，不要形式化 fan-out。
 
-第二条是写新的 brief，再创建 follow-up issue。
-这适用于方向已经改变、任务范围显著扩大、或者原 PR 已经不适合继续承载新要求的情况。
-
-你的反馈必须具体，不要写“请改一下”“还不够好”“再完善些”。
-你要写成可执行指令：补哪一节、删哪一处越界改动、保留哪一部分现有结构、完成后如何判断达标。
-
-如果是 review comment，尽量保持一句问题对应一条 comment，方便 worker 精准响应。
-如果是 follow-up issue，重新遵守第 3 节的 self-contained brief 规则，不要偷懒复用不完整上下文。
-
-## 9. 何时不要使用这个 skill
-
-下面这些情况，你应该明确拒绝 dispatch，并说明为什么不适合 AO：
-
-- 用户说“fix this one typo”。这是 Mode A，直接改，不要建 issue。
-- 用户说“explain what this function does”。这是解释任务，直接解释，不要开 worker。
-- 用户正在互动式调试。比如一边看日志一边追问题，AO 会打断节奏。
-- 当前目录不是 git repo。AO 依赖 git 工作流，没有仓库就不该进入派活流程。
-- 仓库没有配置 GitHub remote。`gh` 和 `batch-spawn` 都依赖明确的远程仓库上下文。
-
-当你拒绝 dispatch 时，不要只说“不用这个 skill”。
-你要给用户一个替代动作，比如直接修、直接解释、或者先初始化 git、remote、`agent-orchestrator.yaml` 再继续。
-
-示例对话四：
-用户说：“解释一下这个函数干嘛的。”
-你应该说：“我不使用 AO dispatch，因为这不是交付型任务，而是即时解释型任务。这里更适合直接阅读代码并解释行为。”
-
-## 10. 常见坑提醒
-
-每次使用这个 skill，都要主动提醒自己下面这些坑：
-
-- Workers 只能看到 issue body，所以每一个相关事实都必须写进 issue body，不要假设 worker 能看到主对话、本地终端历史或你脑中的隐含背景。
-- `agent-orchestrator.yaml` 里的 `runtime` 必须设成 `tmux`，不是 `process`。
-- 从 WSL 调用 `ao start` 或 `ao send` 时，始终要导出或内联 `HTTPS_PROXY`，否则在常见网络环境下可能不稳定或直接失败。
-- 用户执行完 `gh auth login` 之后，还要记得运行下面这个命令：
-
-```bash
-gh auth setup-git
-```
-
-- 仓库创建完成后，`git push` 仍然可能需要代理绕过方案；如果推送失败，引导用户去看 `TROUBLESHOOTING.md`。
-
-最后再提醒一次：你是 CEO，不是默认执行者。
-你的价值在于判断是否该派活、写出高质量 brief、追踪 workers、审阅 PR、推动下一轮迭代。
-但当任务明显不值得 dispatch 时，你也要果断回到直接处理，不要把 AO 变成形式主义。
+最后再提醒一次：你是 CEO，不是隐藏队列管理员。
+你的价值在于判断是否该 dispatch、做粗分类、在同一 turn 内完成 fan-out、
+随后用可观察证据监控和审阅，而不是靠记忆“记着还有几件没派”。
