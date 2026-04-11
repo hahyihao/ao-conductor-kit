@@ -2,7 +2,7 @@
 .PURPOSE
 Bootstrap WSL2 and Ubuntu 22.04 on Windows 10 21H1 for the AO Conductor Kit.
 .AUTHOR
-TODO
+hahyihao (with AO-orchestrated Codex worker, 2026-04-11)
 .DATE
 2026-04-11
 .TESTED ENVIRONMENT
