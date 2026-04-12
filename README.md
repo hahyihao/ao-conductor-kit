@@ -17,8 +17,9 @@
 2. **脚本**：Windows 和 WSL 两端的一键安装脚本
 3. **模板**：新项目即开即用的 `agent-orchestrator.yaml` 和 `CLAUDE.md`
 4. **技能**：让 Claude Code 自动变身"总经理"的 skill 源文件
-5. **CI 配置**：企业级 GitHub Actions workflows（super-linter / CodeQL / gitleaks / dependency-review）
-6. **Brief**：本次 6 路并行派活时用的任务说明书，可作为新任务的写作参考
+5. **工具**：AO webhook sink 和 Claude Code channel bridge，支持 CEO 自动回调
+6. **CI 配置**：企业级 GitHub Actions workflows（super-linter / CodeQL / gitleaks / dependency-review）
+7. **Brief**：本次 6 路并行派活时用的任务说明书，可作为新任务的写作参考
 
 **核心理念**：Claude（总经理）只编排和审核，不直接动手写代码；所有实际工作派给 Codex（员工）并行执行；GitHub Actions 和 AO 的 reaction engine 负责自动闭环质量检查。
 
@@ -122,6 +123,12 @@ agent-orchestrator/
 │   ├── agent-orchestrator.yaml     ← 新项目 AO 配置模板
 │   └── project-CLAUDE.md           ← 新项目 Claude 上下文模板
 │
+├── tools/
+│   ├── README.md                   ← AO event sink / Claude Code channel bridge 配置说明
+│   ├── ao-event-sink.mjs           ← 接收 AO webhook，写入 JSONL inbox，可选转发给 bridge
+│   ├── ao-channel-bridge.mjs       ← Claude Code channel MCP bridge，接收 POST /event 并推送 channel
+│   └── test-ao-channel-bridge.mjs  ← 本地端到端 smoke test
+│
 ├── .github/
 │   ├── dependabot.yml              ← 每周自动升级 GitHub Actions
 │   └── workflows/
@@ -155,6 +162,7 @@ agent-orchestrator/
 | 从零装一遍                 | [INSTALL.md](INSTALL.md)                                               |
 | 理解 Claude/Codex 分工逻辑 | [FLOW.md](FLOW.md)                                                     |
 | 遇到报错                   | [TROUBLESHOOTING.md](TROUBLESHOOTING.md)                               |
+| 给 CEO 配 AO 自动回调      | [tools/README.md](tools/README.md)                                     |
 | 让 Claude 自动变总经理     | [skills/ao-conductor.md](skills/ao-conductor.md)                       |
 | 写新任务的 brief           | [briefs/](briefs/) 目录里任选一份参考                                  |
 | 新项目 AO 配置             | [templates/agent-orchestrator.yaml](templates/agent-orchestrator.yaml) |

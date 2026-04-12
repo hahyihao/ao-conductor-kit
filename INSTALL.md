@@ -771,6 +771,111 @@ curl -I http://localhost:3000
 - `ao start` 启动后立即退出
 - Windows 浏览器打不开 `http://localhost:3000`
 
+## 附加步骤 — 为 CEO Claude Code 注册 AO 回调 Channel Bridge
+
+### 这一阶段要完成什么
+
+如果你希望 worker 完成任务、CI 失败、PR 进入 review pending、review changes requested 这类 AO 事件能自动回推到 CEO 的 Claude Code 会话，而不是靠用户手动复制粘贴消息，那么这里要额外配置一条 callback channel。
+
+这一步不是 AO 基础安装的必需项，所以它不并入 `Phase 1` 到 `Phase 8`。但只要你想让 CEO 具备“被动接收 AO 事件并立即继续处理”的能力，这一步就是必装项。
+
+### 前提检查
+
+开始之前，确认下面四件事：
+
+1. `node -v` 已经是 `20` 系列。
+2. 你已经在 kit 仓库根目录，并且能执行 `npm ci`。
+3. 你知道 `claude` 是运行在 WSL 里还是 Windows 原生 shell 里。
+4. 你准备把 AO webhook 先打到 `tools/ao-event-sink.mjs`，再由它转发给 channel bridge。
+
+这里有一个关键兼容性边界：`tools/ao-channel-bridge.mjs` 依赖仓库里的 `package-lock.json`，因此首次启用 bridge 的机器必须先在仓库根目录执行一次 `npm ci`。不要跳过这一步。
+
+### 要执行的命令
+
+先安装 bridge 依赖。
+
+命令环境：运行 `claude` 的同一侧 shell
+
+```bash
+cd /path/to/ao-conductor-kit
+npm ci
+```
+
+然后在 Claude Code 的 MCP 配置里注册 `ao-channel-bridge`。如果你在 WSL 里运行 `claude`，配置里的脚本路径必须写 WSL 绝对路径；如果你在 Windows 原生 shell 里运行 `claude`，就要写 Windows 绝对路径。
+
+WSL 示例：
+
+```json
+{
+  "mcpServers": {
+    "ao-channel-bridge": {
+      "command": "node",
+      "args": [
+        "/mnt/d/脚本程序/agent-orchestrator/tools/ao-channel-bridge.mjs"
+      ],
+      "env": {
+        "AO_CHANNEL_BRIDGE_HOST": "127.0.0.1",
+        "AO_CHANNEL_BRIDGE_PORT": "8766",
+        "AO_CHANNEL_BRIDGE_PATH": "/event",
+        "AO_CHANNEL_BRIDGE_HEALTH_PATH": "/health"
+      }
+    }
+  }
+}
+```
+
+接着把 event sink 配成向 bridge 转发：
+
+命令环境：WSL bash
+
+```bash
+cd /path/to/ao-conductor-kit
+export AO_EVENT_SINK_FORWARD_TO="http://127.0.0.1:8766/event"
+node tools/ao-event-sink.mjs
+```
+
+最后启动 Claude Code 时显式启用这个开发态 channel：
+
+命令环境：运行 `claude` 的同一侧 shell
+
+```bash
+claude --dangerously-load-development-channels server:ao-channel-bridge
+```
+
+### 预期输出
+
+如果配置正确，你应依次看到下面这些结果：
+
+- `npm ci` 成功装好 `@modelcontextprotocol/sdk`
+- `curl http://127.0.0.1:8766/health` 能返回 bridge 健康信息
+- `curl http://127.0.0.1:8765/health` 能看到 `forwardTo` 指向 `http://127.0.0.1:8766/event`
+- Claude Code 成功启动，不会报 “unknown development channel server”
+- 当 AO 事件到达时，Claude Code 会话中出现 `<channel source="ao-channel-bridge" ...>` 消息
+
+要特别注意一件事：对这个本地 bridge，正确的启动参数是 `--dangerously-load-development-channels server:ao-channel-bridge`，不是 `--channels localhost:8766`。后者适用于普通 channel 插件或允许列表，不适用于这个 repository 里的开发态本地 server。
+
+### 如何验证
+
+先做仓库自带的本地 smoke test：
+
+命令环境：运行 `claude` 的同一侧 shell
+
+```bash
+cd /path/to/ao-conductor-kit
+npm ci
+node tools/test-ao-channel-bridge.mjs
+```
+
+如果输出：
+
+```text
+AO channel bridge smoke test passed.
+```
+
+说明 `AO webhook -> event sink -> channel bridge -> MCP channel notification` 这条链路已经在当前机器上打通。
+
+如果你还想在真实的 CEO Claude Code 会话里补一层手工验证，请参考 [tools/README.md](tools/README.md) 里的 webhook 示例，把它发到 `http://127.0.0.1:8765/`，再观察 Claude Code 窗口里是否立刻出现 channel 消息。
+
 ## 常见问题
 
 ### 什么时候必须重启，什么时候不要反复重跑脚本

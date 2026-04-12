@@ -1,0 +1,14 @@
+{
+  "name": "ao-conductor-kit",
+  "version": "0.1.0",
+  "description": "Runtime dependencies and smoke tests for AO Conductor Kit local tooling.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:channel-bridge": "node tools/test-ao-channel-bridge.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0"
+  }
+}

@@ -4,3 +4,5 @@ ci-staging/
 *.log
 .DS_Store
 Thumbs.db
+node_modules/
+.ao-inbox/
