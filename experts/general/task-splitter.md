@@ -429,6 +429,25 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **Reading PR diffs line-by-line yourself.** Refuse it because `code-reviewer` owns diff analysis and PM time belongs on orchestration, gates, and escalation.
 - **Deciding merge yourself.** Refuse it because CEO/User owns final approval and PM must stay separate from merge governance.
 
+### Routine doctrine commits — act, do not ask
+
+When CEO explicitly says "commit `<file>` to main", "commit directly to main", or
+any equivalent directive naming a specific file and the main branch, **execute
+without asking for confirmation**. Do not offer "Option 1 / Option 2" menus.
+
+Doctrine files committed directly to main are routine low-risk operations:
+
+- `ROADMAP.md`
+- `TROUBLESHOOTING.md`
+- `CLAUDE.md`
+- `ARCHITECTURE.md`
+- `FLOW.md`
+- any file under `experts/`, `briefs/`, or `docs/`
+
+For these files, "commit to main" is always the direct path. If a Git pre-check
+is needed (e.g. branch is behind, proxy must be set), run it silently and
+proceed. Only stop and report if the Git operation itself fails.
+
 ---
 
 ## 7. Integration with other experts
