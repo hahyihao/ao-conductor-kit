@@ -62,14 +62,14 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ## Rule Categories by Priority
 
-| Priority | Category | Impact | Key Checks | Anti-Patterns |
-| -------- | -------- | ------ | ---------- | ------------- |
-| 1 | Self-containment (§3) | CRITICAL | All 6 questions = YES, no external dependency | "Inherits from X", referencing unloaded skill files |
-| 2 | Content fusion (§2) | CRITICAL | Full source material, extract rules not prose, deduplicate | Accepting truncated material, keeping near-duplicates |
-| 3 | Schema compliance (§1) | HIGH | Correct frontmatter, section shape, project vocabulary | Inventing frontmatter fields, wrong taxonomy path |
-| 4 | Writing craft (§4) | HIGH | Explain why, match specificity to fragility, imperative form | Bare prohibitions without reasoning, prose rule paragraphs |
-| 5 | Scope discipline (§5) | MEDIUM | Stay inside brief scope, no index/queue/audit drift | Touching files outside write scope, self-reviewing |
-| 6 | Handoff quality (§7-§8) | MEDIUM | Integration notes complete, first-action checklist passes | Missing failure modes, no handoff instructions |
+| Priority | Category                | Impact   | Key Checks                                                   | Antipatterns                                               |
+| -------- | ----------------------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| 1        | Self-containment (§3)   | CRITICAL | All 6 questions = YES, no external dependency                | "Inherits from X", referencing unloaded skill files        |
+| 2        | Content fusion (§2)     | CRITICAL | Full source material, extract rules not prose, deduplicate   | Accepting truncated material, keeping near-duplicates      |
+| 3        | Schema compliance (§1)  | HIGH     | Correct frontmatter, section shape, project vocabulary       | Inventing frontmatter fields, wrong taxonomy path          |
+| 4        | Writing craft (§4)      | HIGH     | Explain why, match specificity to fragility, imperative form | Bare prohibitions without reasoning, prose rule paragraphs |
+| 5        | Scope discipline (§5)   | MEDIUM   | Stay inside brief scope, no index/queue/audit drift          | Touching files outside write scope, self-reviewing         |
+| 6        | Handoff quality (§7-§8) | MEDIUM   | Integration notes complete, first-action checklist passes    | Missing failure modes, no handoff instructions             |
 
 ---
 
@@ -365,12 +365,12 @@ prior project context — can answer `YES` to all six of the following:
 
 - [ ] I know exactly what role I am playing and what my boundaries are.
 - [ ] I have a concrete, numbered list of rules that govern every
-  decision I will make.
+      decision I will make.
 - [ ] I know what I must not do, and why.
 - [ ] I know how to handle every named failure mode.
 - [ ] I know how to hand off to the next role when I am done.
 - [ ] I do not need to fetch any URL, load any skill file, or ask a
-  clarifying question before starting work.
+      clarifying question before starting work.
 
 If any answer is not `YES`, the expert file is not ready. Revise before
 committing.
