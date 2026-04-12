@@ -51,14 +51,14 @@ This file is self-contained. Follow the numbered rules below without loading any
 
 ## Rule Categories by Priority
 
-| Priority | Category | Impact | Key Checks | Anti-Patterns |
-| ---------- | ---------- | -------- | ------------ | --------------- |
-| 1 | Source authority (§4) | CRITICAL | Official docs > specs > awesome-lists > blogs > Q&A | Citing unread pages, fabricating URLs |
-| 2 | Content completeness (§5) | CRITICAL | Preserve full text, no lossy compression, record every source URL | Paraphrasing, summarizing numbered lists into prose |
-| 3 | Search execution (§6) | HIGH | Calibrate thoroughness, expand with synonyms, parallel queries | Repeating failed queries, serializing independent searches |
-| 4 | Scouting disciplines (§3) | HIGH | Queue-driven only, deduplicate, attribute every rule, ≤200 lines | Inventing domains, overwriting existing experts |
-| 5 | Tool usage (§1) | MEDIUM | Use dedicated tools over shell, read-only during research | Shell grep instead of Grep, creating scratch files |
-| 6 | Handoff quality (§9-§10) | MEDIUM | Update queue, commit with convention, open PR, stop | Continuing after PR, editing index.md |
+| Priority | Category                  | Impact   | Key Checks                                                        | Antipatterns                                               |
+| -------- | ------------------------- | -------- | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1        | Source authority (§4)     | CRITICAL | Official docs > specs > awesome-lists > blogs > Q&A               | Citing unread pages, fabricating URLs                      |
+| 2        | Content completeness (§5) | CRITICAL | Preserve full text, no lossy compression, record every source URL | Paraphrasing, summarizing numbered lists into prose        |
+| 3        | Search execution (§6)     | HIGH     | Calibrate thoroughness, expand with synonyms, parallel queries    | Repeating failed queries, serializing independent searches |
+| 4        | Scouting disciplines (§3) | HIGH     | Queue-driven only, deduplicate, attribute every rule, ≤200 lines  | Inventing domains, overwriting existing experts            |
+| 5        | Tool usage (§1)           | MEDIUM   | Use dedicated tools over shell, read-only during research         | Shell grep instead of Grep, creating scratch files         |
+| 6        | Handoff quality (§9-§10)  | MEDIUM   | Update queue, commit with convention, open PR, stop               | Continuing after PR, editing index.md                      |
 
 ## 1. Tools Available
 
@@ -115,7 +115,8 @@ This file is self-contained. Follow the numbered rules below without loading any
 3. When handing content to `expert-writer`, pass the full extracted text as-is; `expert-writer` is responsible for normalizing and deduplicating, and `expert-scout` is responsible only for completeness of the raw material.
 4. Record the exact source URL for every content block you extract; if a block came from a raw GitHub URL, record the raw URL, not the rendered GitHub URL.
 5. Reuse the first complete fetch whenever it is already verbatim, but refetch the same URL when completeness is in doubt or rule 6 requires a verbatim-recovery attempt.
-6. Document the WebFetch limitation: WebFetch may summarize content longer than roughly 200 lines instead of returning verbatim text; when verbatim content is critical, attempt: (a) Bash `curl` with the raw URL, (b) multiple WebFetch calls with explicit `return verbatim, no commentary` wording, and (c) if it still fails, record in the handoff that the content is a faithful summary rather than verbatim and note the source length.
+6. Document the WebFetch limitation: WebFetch may summarize content longer than roughly 200 lines instead of returning verbatim text; when verbatim content is critical, attempt:
+   (a) Bash `curl` with the raw URL, (b) multiple WebFetch calls with explicit `return verbatim, no commentary` wording, and (c) if it still fails, record in the handoff that the content is a faithful summary rather than verbatim and note the source length.
 
 ## 6. Search Execution Discipline
 
