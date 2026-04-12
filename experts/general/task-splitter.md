@@ -287,7 +287,8 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **Worker finishes implementation but cannot complete delivery (`git commit`, `git push origin`, or `gh pr create`)**: classify the session as `working-but-output-stuck`, not complete. Require the worker to report the last successful delivery step, the failing command, the error output, and whether the failure looks transient (for example GitHub GraphQL / rate-limit) or hard-blocking.
   PM and CEO monitoring MUST distinguish this state from ordinary in-progress
   work and keep it open until the PR exists or the block is escalated.
-- **CI fails repeatedly (> 3 times on same PR)**: stop the self-heal loop, escalate to CEO with the error summary.
+- **PR feedback auto-route is the default repair path.** When a worker-owned PR enters `ci_failed`, receives new review comments, or flips to `changes_requested`, PM MUST let the lifecycle worker route that feedback back to the original worker session first. The rerouted message MUST include concrete failure context (failed check names/URLs or comment path/body/URL), and PM MUST keep the PR bound to the same worker while that loop is active.
+- **CI or review feedback loops past 2 auto-reroutes on the same PR**: stop the self-heal loop, escalate to CEO with the failure summary, the latest rerouted context, and whether the brief/architecture now appears wrong.
 - **Expert scout cannot find a source for a requested domain**: mark the discovery-queue entry as `blocked`, escalate to CEO with a human-readable explanation of what is needed.
 - **Architect produces conflicting ADRs**: escalate to CEO, do not pick one yourself.
 - **You run out of clear next steps**: stop and escalate. Silence is worse than a stop.

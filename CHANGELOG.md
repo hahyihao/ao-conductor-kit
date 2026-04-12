@@ -3,6 +3,15 @@
 All notable changes to the AO Conductor Kit are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- `patches/ao-main-2ebe111a-pr-feedback-context.patch` — upstream AO patch that adds concrete CI/review feedback context to lifecycle auto-reroutes and caps review auto-feedback retries at 2 by default
+
+### Changed
+- `experts/general/task-splitter.md` — now makes `ci_failed` / review auto-routing explicit and escalates after 2 auto-feedback loops on the same PR
+- `templates/agent-orchestrator.yaml` and `templates/project-CLAUDE.md` — document the 2-retry PR feedback loop expectation for project configs
+
 ## [0.2.0] — 2026-04-11
 
 ### Added

@@ -48,4 +48,4 @@ Every issue body must include:
 ## Contact & escalation
 
 - If a worker opens an unsafe or policy-violating PR, the CEO must flag it and request changes via `gh pr review --request-changes`.
-- If 3 iterations fail, the CEO must stop automatic dispatch and report to the human user.
+- If 2 auto-feedback iterations fail on the same PR, the CEO must stop automatic dispatch and report to the human user.

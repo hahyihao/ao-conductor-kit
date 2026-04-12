@@ -25,6 +25,9 @@ defaults:
 
   workspace: worktree
 
+  # AO core defaults already auto-route `ci-failed`, `changes-requested`,
+  # and `bugbot-comments` back to the owning worker session.
+  # If you override `reactions:` below, keep the PR feedback loop capped at 2 retries.
   notifiers: []
 
 projects:
