@@ -3,7 +3,11 @@
 ## 1. Root Cause
 
 - The root cause is both parts together.
-- First, the real delivery bug is a tmux `paste-buffer` to `Enter` race in [`/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts`](/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts): multi-line and long messages go through the paste path, but AO 0.2.2 sends `Enter` after a fixed 300 ms delay, which is not reliable for Codex/Ink-style TUIs once the pasted draft is still rendering.
+- First, the real delivery bug is a tmux `paste-buffer` to `Enter` race in
+  [`/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts`](/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts):
+  multi-line and long messages go through the paste path, but AO 0.2.2 sends
+  `Enter` after a fixed 300 ms delay, which is not reliable for Codex/Ink-style
+  TUIs once the pasted draft is still rendering.
 - Second, the apparent success on the CLI/PM side comes from confirmation false positives in session-manager: once the pasted draft changes pane output, the current confirmation logic can treat that as delivery even if the draft was never actually submitted. I did not change session-manager because it is outside this worker's ownership.
 - The minimal 0.2.2-friendly fix is therefore to harden the runtime send path itself: wait for pasted content to settle, retry `Enter`, and fail explicitly when the draft is still visibly unsubmitted after all retries.
 - I did not choose the broader transports discussed in #853 and #184 because they are architecture work, not a small 0.2.2 patch.
@@ -28,7 +32,8 @@
   multiline messages with Windows-style backslashes are preserved literally,
   a swallowed first `Enter` triggers another retry,
   repeated visible-draft failure now throws instead of returning silent success.
-- I did not run a full repo test sweep, and I did not modify unrelated bug-1 / bug-3 files.
+- I did not run a full repository test sweep, and I did not modify unrelated
+  bug-1 / bug-3 files.
 
 ## 4. Generated Patch File
 
