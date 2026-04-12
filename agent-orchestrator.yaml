@@ -16,3 +16,31 @@ projects:
     path: /root/projects/ao-conductor-kit
     defaultBranch: main
     sessionPrefix: kit
+
+  ao-kit-slot-1:
+    name: AO Kit Slot 1
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-1
+    defaultBranch: lanes/slot-1
+    sessionPrefix: kit1
+
+  ao-kit-slot-2:
+    name: AO Kit Slot 2
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-2
+    defaultBranch: lanes/slot-2
+    sessionPrefix: kit2
+
+  ao-kit-slot-3:
+    name: AO Kit Slot 3
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-3
+    defaultBranch: lanes/slot-3
+    sessionPrefix: kit3
+
+  ao-kit-slot-4:
+    name: AO Kit Slot 4
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-4
+    defaultBranch: lanes/slot-4
+    sessionPrefix: kit4

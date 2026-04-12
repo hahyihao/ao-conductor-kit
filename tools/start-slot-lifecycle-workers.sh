@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
+# Purpose: Clear stale slot orchestrator worktrees safely, then ensure the four
+# AO Kit slot lifecycle workers are running without duplicating healthy ones.
+
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(git -C "$SCRIPT_DIR/.." rev-parse --show-toplevel)
 AO_CONFIG_FILE="$REPO_ROOT/agent-orchestrator.yaml"
+CORE_DIST="/root/agent-orchestrator/packages/core/dist/index.js"
+LIFECYCLE_SERVICE_DIST="/root/agent-orchestrator/packages/cli/dist/lib/lifecycle-service.js"
 WORKTREE_ROOT=/root/.worktrees
-LANE_ROOT=/root/lanes
 DRY_RUN=0
 
 declare -A ACTIVE_ORCHESTRATORS=()
 SLOTS=(1 2 3 4)
+SLOT_PROJECTS=(
+	"ao-kit-slot-1"
+	"ao-kit-slot-2"
+	"ao-kit-slot-3"
+	"ao-kit-slot-4"
+)
 
 log() {
 	printf '[slot-lifecycle] %s\n' "$*"
@@ -29,7 +39,7 @@ usage() {
 Usage: tools/start-slot-lifecycle-workers.sh [--dry-run]
 
 Clean stale slot orchestrator worktrees, prune the shared git worktree registry,
-and then start any missing slot lifecycle/orchestrator sessions.
+and then ensure the four slot lifecycle workers are healthy.
 
 Options:
   --dry-run  Print planned cleanup/start actions without changing the system.
@@ -168,59 +178,53 @@ cleanup_stale_slot_orchestrator_worktrees() {
 	run_cmd git -C "$REPO_ROOT" worktree prune
 }
 
-slot_has_healthy_orchestrator() {
-	local slot="$1"
-	local slot_prefix="kit${slot}-orchestrator-"
-	local active_key session_name
+ensure_slot_lifecycle_workers() {
+	AO_CONFIG_PATH="$AO_CONFIG_FILE" DRY_RUN="$DRY_RUN" node --input-type=module - "${SLOT_PROJECTS[@]}" <<'NODE'
+const projectIds = process.argv.slice(2);
+const dryRun = process.env["DRY_RUN"] === "1";
 
-	for active_key in "${!ACTIVE_ORCHESTRATORS[@]}"; do
-		[[ "$active_key" == "ao-kit-slot-$slot/$slot_prefix"* ]] && return 0
-	done
+const { loadConfig } = await import("/root/agent-orchestrator/packages/core/dist/index.js");
+const { ensureLifecycleWorker, getLifecycleWorkerStatus } = await import(
+  "/root/agent-orchestrator/packages/cli/dist/lib/lifecycle-service.js"
+);
 
-	if ! command -v tmux >/dev/null 2>&1; then
-		return 1
-	fi
+const configPath = process.env["AO_CONFIG_PATH"] ?? "";
+const config = loadConfig();
+let failed = false;
 
-	while IFS= read -r session_name; do
-		[[ "$session_name" == "$slot_prefix"* || "$session_name" == *-"$slot_prefix"* ]] && return 0
-	done < <(tmux list-sessions -F '#S' 2>/dev/null || true)
+for (const projectId of projectIds) {
+  if (!config.projects[projectId]) {
+    console.error(`[slot-lifecycle] ERROR: ${projectId} is missing from ${configPath}`);
+    failed = true;
+    continue;
+  }
 
-	return 1
+  try {
+    if (dryRun) {
+      const status = getLifecycleWorkerStatus(config, projectId);
+      const pid = status.pid ?? "unknown";
+      const action = status.running ? "would skip" : "would start";
+      const reason = status.running ? `already running (PID ${pid})` : "worker not running";
+      console.log(`[slot-lifecycle] ${action} ${projectId} ${reason} log=${status.logFile}`);
+      continue;
+    }
+
+    const status = await ensureLifecycleWorker(config, projectId);
+    const pid = status.pid ?? "unknown";
+    const action = status.started ? "started" : "skipped";
+    const reason = status.started ? `PID ${pid}` : `already running (PID ${pid})`;
+    console.log(`[slot-lifecycle] ${action} ${projectId} ${reason} log=${status.logFile}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[slot-lifecycle] ERROR: ${projectId} ${message}`);
+    failed = true;
+  }
 }
 
-start_missing_slot_lifecycle_workers() {
-	local slot lane_path
-	local had_failures=0
-
-	for slot in "${SLOTS[@]}"; do
-		lane_path="$LANE_ROOT/kit-slot-$slot"
-
-		if slot_has_healthy_orchestrator "$slot"; then
-			log "slot $slot: skipped startup; orchestrator is already healthy"
-			continue
-		fi
-
-		if [[ ! -d "$lane_path" ]]; then
-			warn "slot $slot: cannot start lifecycle recovery; missing lane path $lane_path"
-			had_failures=1
-			continue
-		fi
-
-		log "slot $slot: starting lifecycle recovery via ao start --no-dashboard $lane_path"
-
-		if ((DRY_RUN)); then
-			continue
-		fi
-
-		if run_ao ao start --no-dashboard "$lane_path" >/dev/null; then
-			log "slot $slot: startup command finished"
-		else
-			warn "slot $slot: ao start failed"
-			had_failures=1
-		fi
-	done
-
-	return $had_failures
+if (failed) {
+  process.exit(1);
+}
+NODE
 }
 
 main() {
@@ -242,9 +246,12 @@ main() {
 	done
 
 	[[ -f "$AO_CONFIG_FILE" ]] || die "agent-orchestrator config not found at $AO_CONFIG_FILE"
+	[[ -f "$CORE_DIST" ]] || die "AO core build not found at $CORE_DIST"
+	[[ -f "$LIFECYCLE_SERVICE_DIST" ]] || die "AO CLI lifecycle service not found at $LIFECYCLE_SERVICE_DIST"
+
 	load_active_orchestrators
 	cleanup_stale_slot_orchestrator_worktrees
-	start_missing_slot_lifecycle_workers
+	ensure_slot_lifecycle_workers
 }
 
 main "$@"

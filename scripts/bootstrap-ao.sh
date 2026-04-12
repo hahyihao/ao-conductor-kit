@@ -244,21 +244,199 @@ clone_and_build_ao() {
 	pnpm build
 }
 
-install_ao_symlink() {
-	if [[ -L /usr/local/bin/ao ]] &&
-		[[ "$(readlink -f /usr/local/bin/ao)" == "$AO_BIN" ]] &&
-		ao_is_ready; then
-		log_skip "ao already linked into /usr/local/bin"
-		return
-	fi
-
+install_ao_wrapper() {
 	if [[ ! -f "$AO_BIN" ]]; then
 		die "AO binary not found at $AO_BIN; build step did not complete."
 	fi
 
-	log_step "Linking ao into /usr/local/bin"
+	log_step "Installing ao wrapper into /usr/local/bin"
 	chmod +x "$AO_BIN"
-	ln -sf "$AO_BIN" /usr/local/bin/ao
+	rm -f /usr/local/bin/ao
+	cat >/usr/local/bin/ao <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+AO_BIN="$AO_BIN"
+
+find_config_path() {
+	if [[ -n "\${AO_CONFIG_PATH:-}" && -f "\$AO_CONFIG_PATH" ]]; then
+		printf '%s\n' "\$AO_CONFIG_PATH"
+		return 0
+	fi
+
+	local dir="\${PWD:-.}"
+	while :; do
+		if [[ -f "\$dir/agent-orchestrator.yaml" ]]; then
+			printf '%s\n' "\$dir/agent-orchestrator.yaml"
+			return 0
+		fi
+		if [[ "\$dir" == "/" ]]; then
+			return 1
+		fi
+		dir="\$(dirname "\$dir")"
+	done
+}
+
+has_explicit_start_project() {
+	local arg
+	for arg in "\${@:2}"; do
+		if [[ "\$arg" != -* ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+get_start_positional_arg() {
+	local arg
+	for arg in "\${@:2}"; do
+		if [[ "\$arg" != -* ]]; then
+			printf '%s\n' "\$arg"
+			return 0
+		fi
+	done
+	return 1
+}
+
+resolve_native_start_project() {
+	local config_path="\$1"
+	[[ -n "\$config_path" ]] || return 0
+
+	AO_CONFIG_PATH="\$config_path" node --input-type=module - <<'NODE'
+try {
+  const { loadConfig } = await import("/root/agent-orchestrator/packages/core/dist/index.js");
+  const { findProjectForDirectory } = await import(
+    "/root/agent-orchestrator/packages/cli/dist/lib/project-resolution.js"
+  );
+  const config = loadConfig();
+  const projectIds = Object.keys(config.projects);
+  const currentDir = process.cwd();
+
+  if (projectIds.length === 1) {
+    console.log(projectIds[0]);
+    process.exit(0);
+  }
+
+  const worktreeMatch = currentDir.match(/^\/root\/\.worktrees\/([^/]+)(?:\/|$)/);
+  if (worktreeMatch?.[1] && config.projects[worktreeMatch[1]]) {
+    console.log(worktreeMatch[1]);
+    process.exit(0);
+  }
+
+  const matched = findProjectForDirectory(config.projects, currentDir);
+  if (matched) {
+    console.log(matched);
+  }
+} catch {
+  // Fall back to AO's own CLI error if config discovery fails.
+}
+NODE
+}
+
+resolve_fallback_start_project() {
+	local config_path="\$1"
+	[[ -n "\$config_path" ]] || return 0
+
+	AO_CONFIG_PATH="\$config_path" node --input-type=module - <<'NODE'
+try {
+  const { loadConfig } = await import("/root/agent-orchestrator/packages/core/dist/index.js");
+  const { findProjectForDirectory } = await import(
+    "/root/agent-orchestrator/packages/cli/dist/lib/project-resolution.js"
+  );
+  const config = loadConfig();
+  const projectIds = Object.keys(config.projects);
+  if (projectIds.length <= 1) {
+    process.exit(0);
+  }
+
+  const matched = findProjectForDirectory(config.projects, process.cwd());
+  if (!matched && config.projects["ao-kit"]) {
+    console.log("ao-kit");
+  }
+} catch {
+  // Fall back to AO's own CLI error if config discovery fails.
+}
+NODE
+}
+
+should_start_lifecycle() {
+	local dashboard_enabled=1
+	local orchestrator_enabled=1
+	local arg
+
+	for arg in "\${@:2}"; do
+		case "\$arg" in
+			--no-dashboard)
+				dashboard_enabled=0
+				;;
+			--no-orchestrator)
+				orchestrator_enabled=0
+				;;
+		esac
+	done
+
+	(( dashboard_enabled || orchestrator_enabled ))
+}
+
+run_post_start_helper() {
+	local config_path="\${1:-}"
+	if [[ -z "\$config_path" ]]; then
+		config_path="\$(find_config_path || true)"
+	fi
+
+	if [[ -z "\$config_path" ]]; then
+		return 0
+	fi
+
+	local repo_root helper
+	repo_root="\$(cd "\$(dirname "\$config_path")" && pwd)"
+	helper="\$repo_root/tools/start-slot-lifecycle-workers.sh"
+
+	if [[ -x "\$helper" ]]; then
+		AO_CONFIG_PATH="\$config_path" "\$helper"
+	fi
+}
+
+if [[ "\${1:-}" == "start" ]]; then
+	for arg in "\$@"; do
+		if [[ "\$arg" == "-h" || "\$arg" == "--help" ]]; then
+			exec "\$AO_BIN" "\$@"
+		fi
+	done
+
+	config_path="\$(find_config_path || true)"
+	start_args=("\$@")
+	resolved_project=""
+
+	if [[ -n "\$config_path" ]] && ! has_explicit_start_project "\$@"; then
+		resolved_project="\$(resolve_native_start_project "\$config_path" || true)"
+		fallback_project="\$(resolve_fallback_start_project "\$config_path" || true)"
+		if [[ -n "\$fallback_project" ]]; then
+			start_args+=("\$fallback_project")
+			resolved_project="\$fallback_project"
+		fi
+	elif has_explicit_start_project "\$@"; then
+		resolved_project="\$(get_start_positional_arg "\$@" || true)"
+	fi
+
+	set +e
+	"\$AO_BIN" "\${start_args[@]}"
+	status=\$?
+	set -e
+
+	if [[ \$status -ne 0 ]]; then
+		exit \$status
+	fi
+
+	if should_start_lifecycle "\$@" && [[ "\$resolved_project" == "ao-kit" ]]; then
+		run_post_start_helper "\$config_path"
+	fi
+	exit 0
+fi
+
+exec "\$AO_BIN" "\$@"
+EOF
+	chmod +x /usr/local/bin/ao
 }
 
 verify_toolchain() {
@@ -296,7 +474,7 @@ main() {
 	install_ai_clis
 	install_github_cli
 	clone_and_build_ao
-	install_ao_symlink
+	install_ao_wrapper
 	verify_toolchain
 }
 
