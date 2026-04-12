@@ -553,13 +553,26 @@ fatal: 'feat/issue-4' is already checked out at '/root/.worktrees/ao-kit/kit-7'
 
 ### 修复
 
-清理前一次的 worktree，再让 Git 清理自己的记账：
+优先使用母盘自带的 helper，把 `ao session kill` + worktree 清理串起来：
+
+```bash
+cd /root/projects/<your-project>
+tools/ao-session-purge.sh kit-7
+```
+
+脚本会按 session 名称：
+
+- 如果 AO 里还存在这个 session，就先执行 `ao session kill <name>`
+- 删除 `/root/.worktrees/<project-slug>/<session-name>` 对应的 stale worktree 目录
+- 执行 `git worktree prune`
+
+如果你要手工处理，再按下面的步骤做：
 
 ```bash
 cd /root/projects/<your-project>
 
 # 1. 物理清理 worktree 目录（注意别在路径里犯变量为空的错）
-rm -rf /root/.worktrees/<project-slug>/kit-*
+rm -rf /root/.worktrees/<project-slug>/kit-7
 
 # 2. 让 git 同步它的 worktree 索引
 git worktree prune
@@ -596,7 +609,7 @@ git worktree prune
 ### 预防
 
 1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次上面的清理流程。
-2. 在母盘里提供一个 `tools/prune-worktrees.sh` 脚本，把清理步骤固化下来。
+2. 母盘里已经提供 `tools/ao-session-purge.sh`，以后优先用脚本按 session 定点清理，不要再手写通配 `rm -rf`。
 3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
 4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
 
