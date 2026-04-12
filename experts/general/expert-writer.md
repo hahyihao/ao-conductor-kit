@@ -2,6 +2,7 @@
 name: expert-writer
 agent: codex
 domain: general
+description: "Write and revise expert doctrine files for the AO expert library. Actions: receive source material, extract rules, fuse into self-contained expert files, verify quality, open PRs. Triggers: new expert admission, expert revision, expert-scout handoff with raw material. Deliverables: one Markdown expert file matching library schema under experts/."
 base-skill: oh-my-claudecode:skill + oh-my-claudecode:skillify
 external-sources:
   - https://raw.githubusercontent.com/anthropics/skills/main/skills/skill-creator/SKILL.md
@@ -32,6 +33,43 @@ guidance, and is ready for separate review without PM hand-holding.
 
 The `base-skill` frontmatter records provenance only. Execute from the
 rules in this file; do not depend on an external skill file at runtime.
+
+---
+
+## When to Apply
+
+### Must Use
+
+- A new expert needs to be written from source material (scout handoff or PM brief)
+- An existing expert needs a structural revision (self-iteration, schema alignment)
+- `expert-scout` hands off raw source material that needs normalization into an expert file
+
+### Recommended
+
+- Expert file quality review identifies self-containment gaps
+- Library schema changes require expert files to be updated
+- Source material for an existing `draft` expert becomes available
+
+### Skip
+
+- The task is source research (use `expert-scout` instead)
+- The task is code, tests, scripts, or non-expert-file work
+- The task is library index or audit maintenance (use `library-maintainer`)
+
+**Decision criterion**: If the deliverable is an expert Markdown file that must match the library schema and pass the §3 self-containment check, use this expert.
+
+---
+
+## Rule Categories by Priority
+
+| Priority | Category                | Impact   | Key Checks                                                   | Antipatterns                                               |
+| -------- | ----------------------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| 1        | Self-containment (§3)   | CRITICAL | All 6 questions = YES, no external dependency                | "Inherits from X", referencing unloaded skill files        |
+| 2        | Content fusion (§2)     | CRITICAL | Full source material, extract rules not prose, deduplicate   | Accepting truncated material, keeping near-duplicates      |
+| 3        | Schema compliance (§1)  | HIGH     | Correct frontmatter, section shape, project vocabulary       | Inventing frontmatter fields, wrong taxonomy path          |
+| 4        | Writing craft (§4)      | HIGH     | Explain why, match specificity to fragility, imperative form | Bare prohibitions without reasoning, prose rule paragraphs |
+| 5        | Scope discipline (§5)   | MEDIUM   | Stay inside brief scope, no index/queue/audit drift          | Touching files outside write scope, self-reviewing         |
+| 6        | Handoff quality (§7-§8) | MEDIUM   | Integration notes complete, first-action checklist passes    | Missing failure modes, no handoff instructions             |
 
 ---
 
@@ -135,26 +173,6 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 3. Quality standard
-
-An expert file passes quality review when a worker loading it in
-isolation — with no internet access, no external skill files, and no
-prior project context — can answer `YES` to all six of the following:
-
-- I know exactly what role I am playing and what my boundaries are.
-- I have a concrete, numbered list of rules that govern every decision I
-  will make.
-- I know what I must not do, and why.
-- I know how to handle every named failure mode.
-- I know how to hand off to the next role when I am done.
-- I do not need to fetch any URL, load any skill file, or ask a
-  clarifying question before starting work.
-
-If any answer is "no", the expert file is incomplete and must be revised
-before it is committed.
-
----
-
 ## 4. Writing craft rules
 
 1. **Explain why, not just what.** Write the reasoning behind each rule,
@@ -162,7 +180,6 @@ before it is committed.
    exists adapt it correctly to edge cases; workers who only see the
    rule follow it mechanically and fail at the edges. (Source:
    `anthropics/skills` `skill-creator` — "theory of mind".)
-
 2. **Match specificity to fragility.** High freedom (text instructions)
    for decisions where multiple approaches are valid. Medium freedom
    (pseudocode/template with parameters) for situations with a preferred
@@ -171,27 +188,23 @@ before it is committed.
    consistency is critical. Choosing the wrong freedom level is the most
    common expert file mistake. (Source: Anthropic official best
    practices.)
-
 3. **Use imperative form.** "To accomplish X, do Y." Not "You should do
    Y" or "Claude will do Y." The frontmatter description must be
    third-person ("This expert is used when..."). The body must be
    imperative. Use active voice, direct language, and no filler words.
    (Source: `anthropics/claude-code` `plugin-dev`
    `skill-development`; `oh-my-claudecode` `writer.md`.)
-
 4. **Consistent terminology throughout.** Choose one term for each
    concept and use it everywhere: "brief" not "task / prompt /
    instruction"; "worker" not "agent / Claude / assistant"; "expert
    file" not "skill / prompt / persona". Inconsistency in an expert file
    confuses workers mid-execution. (Source: Anthropic official best
    practices.)
-
 5. **Conciseness gate: challenge every paragraph.** For each section you
    write, ask: "Does the worker need this? Can it be assumed? Does this
    justify its token cost?" Add context Claude doesn't already have.
    Remove explanations of things Claude knows. (Source: Anthropic
    official best practices — "concise is key".)
-
 6. **Write a description that activates reliably.** The description is
    how task-splitter finds this expert. It must include: what the expert
    does, and when to use it. Use specific "USE WHEN" language. Write in
@@ -200,7 +213,6 @@ before it is committed.
    schema does not expose a dedicated description field, make the opening
    role paragraph carry the same "what + when" trigger information.
    (Source: mellanon gist, empirical data.)
-
 7. **Two-stage understanding before writing.** Before drafting any
    expert file: Stage 1 — consume all source material and uncover
    implicit requirements (error handling, edge cases, output formats)
@@ -210,7 +222,6 @@ before it is committed.
    what the worker actually needs. Generalize across patterns instead of
    overfitting to one example. (Source: `agent-skill-creator`;
    `anthropics/skills` `skill-creator`.)
-
 8. **Design feedback loops for verification-critical workflows.** If the
    expert file defines a workflow involving output that can be validated,
    include a "run validator -> fix errors -> repeat" loop. Workflows
@@ -319,6 +330,7 @@ before it is committed.
    ---
    name: <identifier> # kebab-case, globally unique
    domain: general|project|language|tool
+   description: "What the expert does, when to use it, and what it delivers."
    base-skill: <reference to mature source>
    external-sources: # optional extra links
      - <url>
@@ -342,3 +354,26 @@ before it is committed.
    admission artifact is ready for separate review.
 5. Quality gate reminder: if any answer in §3 is not `YES`, the file is
    not ready no matter how complete it feels.
+
+---
+
+## 3. Quality Gate
+
+An expert file passes quality review when a worker loading it in
+isolation — with no internet access, no external skill files, and no
+prior project context — can answer `YES` to all six of the following:
+
+- [ ] I know exactly what role I am playing and what my boundaries are.
+- [ ] I have a concrete, numbered list of rules that govern every
+      decision I will make.
+- [ ] I know what I must not do, and why.
+- [ ] I know how to handle every named failure mode.
+- [ ] I know how to hand off to the next role when I am done.
+- [ ] I do not need to fetch any URL, load any skill file, or ask a
+      clarifying question before starting work.
+
+If any answer is not `YES`, the expert file is not ready. Revise before
+committing.
+
+Run this gate as the final step before opening the PR. Do not treat a
+passing diff as a substitute for a passing gate.
