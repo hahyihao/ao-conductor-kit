@@ -17,6 +17,8 @@ TMUX_RELEASE_URL="https://github.com/tmux/tmux/releases/download/${TMUX_SOURCE_V
 TMUX_TARBALL="/tmp/tmux-${TMUX_SOURCE_VERSION}.tar.gz"
 TMUX_SRC_DIR="/tmp/tmux-${TMUX_SOURCE_VERSION}"
 TMUX_BACKUP_BIN=/usr/bin/tmux.3.2a.backup
+GH_KEYRING=/etc/apt/keyrings/githubcli-archive-keyring.gpg
+GH_SOURCE_LIST=/etc/apt/sources.list.d/github-cli.list
 
 log_step() { printf '\033[1;36m==>\033[0m %s\n' "$1"; }
 log_skip() { printf '\033[1;33m==>\033[0m %s\n' "$1"; }
@@ -30,17 +32,22 @@ require_root() {
 	[[ ${EUID:-$(id -u)} -eq 0 ]] || die "This script must run as root inside WSL."
 }
 
+have_command() {
+	command -v "$1" >/dev/null 2>&1
+}
+
 is_package_installed() {
 	dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q '^install ok installed$'
 }
 
 have_all_base_packages() {
-	local pkg
-	for pkg in "${BASE_PACKAGES[@]}"; do
-		if ! is_package_installed "$pkg"; then
+	local package
+	for package in "${BASE_PACKAGES[@]}"; do
+		if ! is_package_installed "$package"; then
 			return 1
 		fi
 	done
+	return 0
 }
 
 node_major() {
@@ -175,11 +182,11 @@ ensure_safe_tmux() {
 }
 
 install_nodejs() {
-	if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+	if have_command node && have_command npm; then
 		local major
 		major="$(node_major || true)"
 		if [[ "$major" =~ ^[0-9]+$ ]] && ((major >= 20)); then
-			log_skip "Node.js $(node --version) already installed"
+			log_skip "Keeping existing Node.js $(node --version)"
 			return
 		fi
 	fi
@@ -190,7 +197,7 @@ install_nodejs() {
 }
 
 install_pnpm() {
-	if command -v pnpm >/dev/null 2>&1 && [[ "$(pnpm --version 2>/dev/null)" == "9.15.4" ]]; then
+	if have_command pnpm && [[ "$(pnpm --version 2>/dev/null)" == "9.15.4" ]]; then
 		log_skip "pnpm 9.15.4 already installed"
 		return
 	fi
@@ -200,7 +207,7 @@ install_pnpm() {
 }
 
 install_ai_clis() {
-	if command -v codex >/dev/null 2>&1 && command -v claude >/dev/null 2>&1; then
+	if have_command codex && have_command claude; then
 		log_skip "Codex and Claude Code CLIs already installed"
 		return
 	fi
@@ -210,18 +217,17 @@ install_ai_clis() {
 }
 
 install_github_cli() {
-	if command -v gh >/dev/null 2>&1; then
+	if have_command gh; then
 		log_skip "GitHub CLI already installed"
 		return
 	fi
 
 	log_step "Installing GitHub CLI"
 	install -d -m 755 /etc/apt/keyrings
-	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-		-o /etc/apt/keyrings/githubcli-archive-keyring.gpg
-	chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-	echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-		>/etc/apt/sources.list.d/github-cli.list
+	curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o "$GH_KEYRING"
+	chmod go+r "$GH_KEYRING"
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=$GH_KEYRING] https://cli.github.com/packages stable main" \
+		>"$GH_SOURCE_LIST"
 	apt-get update -qq
 	DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gh
 }
@@ -233,6 +239,10 @@ clone_and_build_ao() {
 	fi
 
 	log_step "Cloning and building Agent Orchestrator"
+	if [[ -e "$AO_ROOT" && ! -d "$AO_ROOT/.git" ]]; then
+		die "Expected $AO_ROOT to be a git checkout, but it already exists as something else."
+	fi
+
 	if [[ ! -d "$AO_ROOT/.git" ]]; then
 		git clone https://github.com/ComposioHQ/agent-orchestrator "$AO_ROOT"
 	else
@@ -439,26 +449,33 @@ EOF
 	chmod +x /usr/local/bin/ao
 }
 
+verify_required_commands() {
+	local command_name
+	for command_name in git tmux node npm pnpm codex claude gh ao; do
+		have_command "$command_name" || die "Required command '$command_name' is missing from PATH."
+	done
+}
+
 verify_toolchain() {
-	if command -v git >/dev/null 2>&1 &&
-		command -v tmux >/dev/null 2>&1 &&
-		command -v node >/dev/null 2>&1 &&
-		command -v npm >/dev/null 2>&1 &&
-		command -v pnpm >/dev/null 2>&1 &&
-		command -v codex >/dev/null 2>&1 &&
-		command -v claude >/dev/null 2>&1 &&
-		command -v gh >/dev/null 2>&1 &&
-		command -v ao >/dev/null 2>&1; then
-		log_step "Verifying installed toolchain"
-	else
-		die "One or more required commands are missing from PATH."
+	local node_major_version node_version pnpm_version
+
+	log_step "Verifying installed toolchain"
+	verify_required_commands
+
+	node_version="$(node --version)"
+	node_major_version="$(node_major)"
+	if [[ ! "$node_major_version" =~ ^[0-9]+$ ]] || ((node_major_version < 20)); then
+		die "Node.js 20 or newer is required, found $node_version."
 	fi
+
+	pnpm_version="$(pnpm --version)"
+	[[ "$pnpm_version" == "9.15.4" ]] || die "pnpm 9.15.4 is required, found $pnpm_version."
 
 	git --version
 	tmux -V
-	node --version
+	printf '%s\n' "$node_version"
 	npm --version
-	pnpm --version
+	printf '%s\n' "$pnpm_version"
 	codex --version
 	claude --version
 	gh --version | sed -n '1p'
