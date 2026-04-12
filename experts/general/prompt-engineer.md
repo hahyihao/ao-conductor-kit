@@ -1,6 +1,6 @@
 ---
 name: prompt-engineer
-agent: claude-code
+agent: claude-code-sonnet
 model: claude-sonnet-4-6
 domain: general
 base-skill: official prompt-engineering guides (OpenAI + Anthropic + Gemini)

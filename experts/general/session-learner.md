@@ -1,6 +1,6 @@
 ---
 name: session-learner
-agent: claude-code
+agent: claude-code-sonnet
 model: claude-sonnet-4-6
 domain: general
 base-skill: anexpn/claude-plugins:session-learner + Anthropic memory/context management

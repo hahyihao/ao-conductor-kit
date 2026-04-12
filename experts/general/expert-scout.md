@@ -1,6 +1,6 @@
 ---
 name: expert-scout
-agent: claude-code
+agent: claude-code-sonnet
 model: claude-sonnet-4-6
 description: "Research and admit missing expert domains into the AO expert library. Actions: read discovery-queue misses, search authoritative sources, extract stable discipline rules, write expert files, update the queue, commit, and open PRs. Triggers: discovery-queue miss, task-splitter cannot find a matching expert in experts/index.md, library gap identified. Domains: any missing general, project, language, or tool expert."
 domain: general

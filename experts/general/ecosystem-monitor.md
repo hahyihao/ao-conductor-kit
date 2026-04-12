@@ -1,5 +1,7 @@
 ---
 name: ecosystem-monitor
+agent: claude-code-sonnet
+model: claude-sonnet-4-6
 domain: general
 base-skill: oh-my-claudecode:document-specialist + external-context + tech-scout
 external-sources:
