@@ -120,7 +120,8 @@ Use the narrowest tool that fits the job, because dedicated tools preserve struc
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
 <!-- prettier-ignore -->
-1. **Monitor.** Run `ao status` immediately after every `ao spawn` / `ao batch-spawn`, every 5 minutes while workers are active, and whenever a CI/review notification arrives, because vague monitoring windows let stuck or `working-but-output-stuck` sessions hide in plain sight. If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO. Track your own context budget too; when you approach the warning threshold in §10.2, pause and surface state before silent degradation starts.
+1. **Monitor.** Run `ao status` immediately after every `ao spawn` / `ao batch-spawn`, every 5 minutes while workers are active, and whenever a CI/review notification arrives, because vague monitoring windows let stuck or `working-but-output-stuck` sessions hide in plain sight.
+   If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO. Track your own context budget too; when you approach the warning threshold in §10.2, pause and surface state before silent degradation starts.
 
 ---
 
@@ -149,7 +150,8 @@ Each sub-task has a clear, observable acceptance condition. Examples:
 - "`gh pr view <N>` shows mergeable=true and CI=green"
 
 <!-- prettier-ignore -->
-Completion criteria for dispatched worker tasks MUST verify delivery state, not just local implementation state. If the intended output is a PR, the acceptance path MUST make it observable that `git commit`, `git push origin`, and `gh pr create` all completed. A worker with code committed locally or a branch pushed but no PR open is not done; if implementation is finished but handoff failed, the correct state is `working-but-output-stuck`.
+Completion criteria for dispatched worker tasks MUST verify delivery state, not just local implementation state. If the intended output is a PR, the acceptance path MUST make it observable that `git commit`, `git push origin`, and `gh pr create` all completed.
+A worker with code committed locally or a branch pushed but no PR open is not done; if implementation is finished but handoff failed, the correct state is `working-but-output-stuck`.
 
 If you cannot state the acceptance condition in one sentence, the sub-task is too vague to dispatch.
 
@@ -187,7 +189,8 @@ Use the task shape to choose experts. These mappings are practical defaults:
 | No matching expert, unclear domain ownership, suspected gap in the library        | `expert-scout`       | Trigger discovery through `experts/discovery-queue.md` and block dispatch until the expert lands. |
 
 <!-- prettier-ignore -->
-These mappings are additive. If a task clearly spans multiple rows, inject all matching experts, not the single "best" one. The table is a default routing floor; newly admitted experts that appear in `experts/index.md` are valid targets even before this table is updated. Example: an architecture ADR with a docs handoff needs both `architect` and `writer`; a bugfix with new regression coverage may need both `code-writer` and `test-engineer`.
+These mappings are additive. If a task clearly spans multiple rows, inject all matching experts, not the single "best" one. The table is a default routing floor; newly admitted experts that appear in `experts/index.md` are valid targets even before this table is updated.
+Example: an architecture ADR with a docs handoff needs both `architect` and `writer`; a bugfix with new regression coverage may need both `code-writer` and `test-engineer`.
 
 ### Brief injection contract
 
