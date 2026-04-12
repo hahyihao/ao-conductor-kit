@@ -26,6 +26,7 @@ Last updated: 2026-04-13 (per-expert last-updated refresh)
 | session-learner    | general | anexpn/claude-plugins:session-learner + Anthropic memory/context management | 2026-04-13   | active |
 | task-splitter      | general | oh-my-claudecode:planner + oh-my-claudecode:architect                       | 2026-04-13   | active |
 | test-engineer      | general | oh-my-claudecode:test-engineer                                              | 2026-04-12   | active |
+| ui-designer        | general | ui-ux-pro-max                                                               | 2026-04-13   | active |
 | writer             | general | oh-my-claudecode:writer                                                     | 2026-04-12   | active |
 
 ## Project experts
@@ -53,7 +54,7 @@ Empty. Auto-populated by expert-scout on demand.
 
 ## Stats
 
-- Total experts: 29
-- Active: 29
+- Total experts: 30
+- Active: 30
 - Archived: 0
 - Awaiting discovery: 0 (see `discovery-queue.md`)
