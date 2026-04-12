@@ -1,6 +1,6 @@
 # AO Conductor Kit — Roadmap
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-13
 > Source of truth for round status and pending work.
 
 ---
@@ -43,16 +43,16 @@ Total experts in library: 27
 
 ---
 
-## Community Improvements (IN PROGRESS, dispatched 2026-04-12)
+## Community Improvements (DONE, merged 2026-04-12)
 
-7 tasks dispatched, workers spawning:
-- [ ] CI auto-feedback loop
-- [ ] MAX_ITERATIONS kill switch (task-splitter)
-- [ ] Token budget 85% warning (task-splitter)
-- [ ] auto-reviewer expert
-- [ ] REFLECTION accumulation loop
-- [ ] docs/rolling-handoff-spec.md
-- [ ] ecosystem-monitor expert
+7 tasks merged to main:
+- [x] CI auto-feedback loop (#132)
+- [x] MAX_ITERATIONS kill switch (task-splitter) (#133)
+- [x] Token budget 85% warning (task-splitter) (#134)
+- [x] auto-reviewer expert (#135)
+- [x] REFLECTION accumulation loop (#136)
+- [x] docs/rolling-handoff.md specification (#137)
+- [x] ecosystem-monitor expert (#138)
 
 ---
 
