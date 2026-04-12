@@ -133,15 +133,15 @@ PM pool 的容量不是“有几个 tmux 窗口”，
 
 ### 3.1 核心参数
 
-| 参数 | 含义 | 默认纪律 |
-| --- | --- | --- |
-| `slot_count` | 已配置的 PM slot 总数 | 只统计有稳定身份的 slot |
-| `healthy_slots` | 当前可观察且健康的 slot 数量 | `idle` + `assigned` + `draining`，不含 `offline` |
-| `idle_slots` | 当前能立刻接任务的 slot 数量 | 必须可观察且未持有 active ownership |
-| `assigned_slots` | 已被 canonical item 占用的 slot 数量 | 一个 active dispatch chain 算 1 |
-| `blocked_slots` | 有明确阻塞、尚未释放 ownership 的 slot 数量 | 不可继续派发 |
-| `warm_spares` | 预留出来的空闲余量 | 多 slot 项目建议至少保留 1 |
-| `independent_batches` | 当前真的可以独立并发的批次数 | 只统计 brief 可自包含的批次 |
+| 参数                  | 含义                                        | 默认纪律                                         |
+| --------------------- | ------------------------------------------- | ------------------------------------------------ |
+| `slot_count`          | 已配置的 PM slot 总数                       | 只统计有稳定身份的 slot                          |
+| `healthy_slots`       | 当前可观察且健康的 slot 数量                | `idle` + `assigned` + `draining`，不含 `offline` |
+| `idle_slots`          | 当前能立刻接任务的 slot 数量                | 必须可观察且未持有 active ownership              |
+| `assigned_slots`      | 已被 canonical item 占用的 slot 数量        | 一个 active dispatch chain 算 1                  |
+| `blocked_slots`       | 有明确阻塞、尚未释放 ownership 的 slot 数量 | 不可继续派发                                     |
+| `warm_spares`         | 预留出来的空闲余量                          | 多 slot 项目建议至少保留 1                       |
+| `independent_batches` | 当前真的可以独立并发的批次数                | 只统计 brief 可自包含的批次                      |
 
 ### 3.2 有效容量
 
