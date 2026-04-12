@@ -1,5 +1,6 @@
 ---
 name: env-ops
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:git-master
 external-sources:

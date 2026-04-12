@@ -1,5 +1,6 @@
 ---
 name: library-maintainer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:verifier + oh-my-claudecode:simplify
 external-sources:

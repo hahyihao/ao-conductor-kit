@@ -1,5 +1,6 @@
 ---
 name: test-engineer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:test-engineer
 external-sources:

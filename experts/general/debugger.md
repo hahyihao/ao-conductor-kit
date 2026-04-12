@@ -1,5 +1,7 @@
 ---
 name: debugger
+agent: claude-code
+model: claude-opus-4-6
 domain: general
 base-skill: oh-my-claudecode:debugger + tracer
 external-sources:

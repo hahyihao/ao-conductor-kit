@@ -1,5 +1,6 @@
 ---
 name: code-writer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:executor
 external-sources:

@@ -1,5 +1,7 @@
 ---
 name: task-splitter
+agent: claude-code
+model: claude-opus-4-6
 domain: general
 base-skill: oh-my-claudecode:planner + oh-my-claudecode:architect
 external-sources:

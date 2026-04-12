@@ -1,5 +1,7 @@
 ---
 name: code-reviewer
+agent: claude-code
+model: claude-opus-4-6
 domain: general
 base-skill: oh-my-claudecode:code-reviewer + oh-my-claudecode:security-reviewer
 external-sources:
