@@ -22,6 +22,7 @@ AO 初装故障排查记录
 - [Issue 10：Codex 提示 `bubblewrap on PATH not found`](#issue-10codex-提示-bubblewrap-on-path-not-found)
 - [Issue 11：tmux 3.2a segfault 导致所有 codex TUI session 神秘死亡](#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)
 - [Issue 12：ao session kill 不清 worktree，新 worker 因 Git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
+- [Issue 13：orchestrator 启动时出现 Windows PATH 污染 warning](#issue-13orchestrator-启动时出现-windows-path-污染-warning)
 - [Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端](#issue-14ao-webapi-假死实为卡住的-gh-api-graphql-拖住-nextjs-服务端)
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
@@ -612,6 +613,51 @@ git worktree prune
 2. 母盘里已经提供 `tools/ao-session-purge.sh`，以后优先用脚本按 session 定点清理，不要再手写通配 `rm -rf`。
 3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
 4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
+
+## Issue 13：orchestrator 启动时出现 Windows PATH 污染 warning
+
+### 现象
+
+`ao start` 本身可以成功，agent 也能继续工作，但 orchestrator 或 worker 的启动输出里会出现一条 PATH 污染 warning。
+warning 里通常能看到 `/mnt/c/...`、`/mnt/d/...` 这类从 WSL 继承来的 Windows PATH 片段。
+功能层面往往还能继续跑，所以它很容易被拖成一个“以后再说”的技术债。
+
+### 根因
+
+这不是裸 `@composio/ao@0.2.2` 的 patch 点。
+review 复核已经确认：精确的 `0.2.2` 标签里还没有 `packages/core/src/agent-workspace-hooks.ts` 这组文件，所以把 patch 命名成 `ao-0.2.2-*` 会误导操作者。
+
+真正的补丁点出现在更晚的 upstream `main` 结构里：`buildAgentPath(process.env["PATH"])` 会把当前 WSL shell 继承到的 PATH 原样带进 agent/orchestrator 环境，于是 `/mnt/<drive>/...` 这类 WSL 翻译后的 Windows PATH 项也一起带了进去。
+
+本 kit 里提供的 patch 已按 2026-04-12 的 upstream checkout 验证通过，当时 `/root/agent-orchestrator` 的提交是 `2ebe111af002a19566dd03c96b7c9dbb817f000c`，版本描述输出是 `@composio/ao-cli@0.2.2-386-g2ebe111a`。
+
+### 修复
+
+如果你的 AO checkout 与上面这类 post-0.2.2 的 upstream `main` 结构一致，可以直接应用 kit 自带 patch：
+
+```bash
+KIT_ROOT=/mnt/d/your/path/to/agent-orchestrator
+cd /root/agent-orchestrator
+
+git rev-parse HEAD
+git describe --tags --always
+test -f packages/core/src/agent-workspace-hooks.ts
+
+git apply --check "$KIT_ROOT/patches/ao-main-2ebe111a-sanitize-windows-path.patch"
+git apply "$KIT_ROOT/patches/ao-main-2ebe111a-sanitize-windows-path.patch"
+
+pnpm --filter @aoagents/ao-core test -- src/__tests__/agent-workspace-hooks.test.ts
+pnpm --filter @aoagents/ao-core build
+pnpm --filter @aoagents/ao-plugin-agent-codex test -- src/index.test.ts --runInBand
+```
+
+如果上面的文件存在性检查失败，或者 patch 预检失败，就不要硬套。那说明你的 AO checkout 太旧，或者已经偏离了这个 patch 对应的 upstream 结构，应该先对齐版本，再决定是重做 patch 还是直接升级到较新的 upstream `main`。
+
+### 预防
+
+把这个 patch 当成“针对特定 upstream 提交族的 hotfix”，不要再把它宣传成“AO 0.2.2 patch”。
+如果你保留 `bootstrap-ao.sh` 的默认行为，也就是直接 clone upstream `main`，那么最稳妥的路径是在首次 build 完 AO 后立刻按 `INSTALL.md` 的 apply 步骤做一次预检。
+如果你手动把 AO pin 在更老的 tag 上，先检查目标文件是否存在，再决定是否沿用这份 patch，不要只看文件名就直接 apply。
 
 ## Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端
 
