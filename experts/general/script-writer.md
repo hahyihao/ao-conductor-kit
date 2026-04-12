@@ -1,5 +1,6 @@
 ---
 name: script-writer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:executor + shellcheck
 external-sources:

@@ -1,5 +1,6 @@
 ---
 name: writer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:writer
 external-sources:

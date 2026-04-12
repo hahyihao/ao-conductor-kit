@@ -1,5 +1,6 @@
 ---
 name: refactorer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:code-simplifier
 external-sources:

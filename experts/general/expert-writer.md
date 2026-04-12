@@ -1,5 +1,6 @@
 ---
 name: expert-writer
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:skill + oh-my-claudecode:skillify
 external-sources:

@@ -1,5 +1,6 @@
 ---
 name: planner
+agent: codex
 domain: general
 base-skill: oh-my-claudecode:planner
 external-sources:

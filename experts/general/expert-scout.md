@@ -1,5 +1,6 @@
 ---
 name: expert-scout
+agent: claude-code-sonnet
 domain: general
 base-skill: oh-my-claudecode:document-specialist + external-context + tech-scout
 external-sources:
