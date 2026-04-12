@@ -4,6 +4,7 @@ import http from "node:http";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 import { normalizeAoPayload } from "./lib/ao-event-record.mjs";
 
@@ -16,6 +17,50 @@ const EVENTS_FILE = join(INBOX_DIR, "events.jsonl");
 const MAX_BODY_BYTES = Number.parseInt(process.env.AO_EVENT_SINK_MAX_BODY_BYTES || "1048576", 10);
 const FORWARD_TO = typeof process.env.AO_EVENT_SINK_FORWARD_TO === "string" ? process.env.AO_EVENT_SINK_FORWARD_TO.trim() : "";
 const FORWARD_TIMEOUT_MS = Number.parseInt(process.env.AO_EVENT_SINK_FORWARD_TIMEOUT_MS || "3000", 10);
+const AO_DASHBOARD_PORT = Number.parseInt(process.env.AO_DASHBOARD_PORT || "3000", 10);
+const AO_ENRICH_TIMEOUT_MS = Number.parseInt(process.env.AO_ENRICH_TIMEOUT_MS || "2000", 10);
+
+/**
+ * 用 AO dashboard API 补全 record 里缺失的 issue 和 pr 字段。
+ * AO 的 lifecycle 事件 data 里不带 issueId/prNumber，这里做一次回查补全。
+ * 失败时静默返回原 record，不阻塞写入。
+ */
+async function enrichFromAoApi(record) {
+  if (!record.session) return record;
+  if (record.issue !== null && record.pr?.number !== null) return record;
+
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${AO_DASHBOARD_PORT}/api/sessions/${record.session}`,
+      { signal: AbortSignal.timeout(AO_ENRICH_TIMEOUT_MS) },
+    );
+    if (!res.ok) return record;
+    const data = await res.json();
+
+    const issue = record.issue ?? (data.issueId ? String(data.issueId) : null);
+    const prNumber = record.pr?.number ?? (typeof data.pr?.number === "number" ? data.pr.number : null);
+    const prUrl = record.pr?.url ?? (typeof data.pr?.url === "string" ? data.pr.url : null);
+
+    const pr = (record.pr || prNumber !== null || prUrl !== null)
+      ? { ...(record.pr ?? {}), number: prNumber, url: prUrl, status: record.pr?.status ?? null }
+      : null;
+
+    // 重建 summary，把补全后的 issue/pr 加进去
+    const parts = [record.eventType || "unknown"];
+    if (record.session) parts.push(`session=${record.session}`);
+    if (issue) parts.push(`issue=${issue}`);
+    if (pr?.number !== null && pr?.number !== undefined) parts.push(`pr=#${pr.number}`);
+    if (pr?.url) parts.push(`prUrl=${pr.url}`);
+    if (pr?.status) parts.push(`prStatus=${pr.status}`);
+    if (record.ci?.status) parts.push(`ci=${record.ci.status}`);
+    if (record.review?.status) parts.push(`review=${record.review.status}`);
+    const summary = parts.join(" ");
+
+    return { ...record, issue, pr, summary };
+  } catch {
+    return record;
+  }
+}
 
 function buildForwardPayload(record) {
   return {
@@ -123,7 +168,7 @@ const server = http.createServer((req, res) => {
       try {
         const raw = Buffer.concat(chunks).toString("utf8");
         const payload = JSON.parse(raw);
-        const record = normalizeAoPayload(payload);
+        const record = await enrichFromAoApi(normalizeAoPayload(payload));
         let written = true;
         let errorMessage = null;
 
@@ -132,6 +177,16 @@ const server = http.createServer((req, res) => {
         } catch (error) {
           written = false;
           errorMessage = error instanceof Error ? error.message : String(error);
+        }
+
+        // 有 session 状态变化时，后台异步刷新 ceo-state.md，不阻塞响应
+        if (written && record.session) {
+          const stateScript = resolve(SCRIPT_DIR, "ao-update-ceo-state.mjs");
+          spawn(process.execPath, [stateScript], {
+            detached: true,
+            stdio: "ignore",
+            env: { ...process.env, AO_EVENT_SINK_DIR: INBOX_DIR },
+          }).unref();
         }
 
         const forward = await forwardRecord(record);

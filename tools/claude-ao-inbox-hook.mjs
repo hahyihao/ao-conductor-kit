@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const LEGACY_DEFAULT_INBOX_DIR = "/mnt/d/脚本程序/agent-orchestrator/.ao-inbox";
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const MAX_DETAIL_EVENTS = Number.parseInt(process.env.AO_CLAUDE_INBOX_MAX_DETAIL || "8", 10);
 const MAX_CONTEXT_CHARS = Number.parseInt(process.env.AO_CLAUDE_INBOX_MAX_CONTEXT || "6000", 10);
-const EVENT_SINK_FILE = fileURLToPath(new URL("./ao-event-sink.mjs", import.meta.url));
 
 function readStdin() {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolvePromise, reject) => {
     const chunks = [];
     process.stdin.on("data", (chunk) => chunks.push(chunk));
-    process.stdin.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    process.stdin.on("end", () => resolvePromise(Buffer.concat(chunks).toString("utf8")));
     process.stdin.on("error", reject);
   });
 }
@@ -41,13 +40,8 @@ function asNumber(value) {
 }
 
 function discoverDefaultInboxDir() {
-  try {
-    const source = readFileSync(EVENT_SINK_FILE, "utf8");
-    const match = source.match(/const INBOX_DIR\s*=\s*process\.env\.AO_EVENT_SINK_DIR\s*\|\|\s*["']([^"']+)["'];/);
-    return match?.[1] || LEGACY_DEFAULT_INBOX_DIR;
-  } catch {
-    return LEGACY_DEFAULT_INBOX_DIR;
-  }
+  // 优先用相对路径推算（tools/../.ao-inbox），不依赖 regex 解析 sink 文件
+  return resolve(SCRIPT_DIR, "..", ".ao-inbox");
 }
 
 function resolvePaths() {
@@ -56,6 +50,7 @@ function resolvePaths() {
     inboxDir,
     eventsFile: join(inboxDir, "events.jsonl"),
     cursorFile: process.env.AO_CLAUDE_INBOX_CURSOR || join(inboxDir, "cursor"),
+    stateFile: join(inboxDir, "ceo-state.md"),
   };
 }
 
@@ -353,7 +348,24 @@ async function main() {
       ? input.hook_event_name
       : "UserPromptSubmit";
 
-  const { eventsFile, cursorFile } = resolvePaths();
+  const { eventsFile, cursorFile, stateFile } = resolvePaths();
+
+  // SessionStart：只有存在活跃任务时才注入，避免无意义的上下文污染
+  if (hookEventName === "SessionStart") {
+    if (!existsSync(stateFile)) return;
+
+    const stateContent = readFileSync(stateFile, "utf8").trim();
+    // ceo-state.md 里没有活跃 session 行（包含 ⚙ 或 📝 图标）就跳过注入
+    const hasActiveSessions = /[⚙📝]/.test(stateContent);
+    if (!hasActiveSessions) return;
+
+    const hookOutput = buildHookOutput("SessionStart",
+      `## AO 有任务在跑（新窗口恢复上下文）\n\n${stateContent}`);
+    if (hookOutput) process.stdout.write(`${hookOutput}\n`);
+    return;
+  }
+
+  // UserPromptSubmit：注入未读事件（原有逻辑）
   if (!existsSync(eventsFile)) {
     return;
   }
