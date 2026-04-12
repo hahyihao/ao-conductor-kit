@@ -28,6 +28,7 @@ AO 初装故障排查记录
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
+- [CEO 派发标准命令](#ceo-派发标准命令)
 
 ## Issue 1：Win10 21H1 上 `wsl --install` 无法识别
 
@@ -909,8 +910,9 @@ GIT_TRACE_CURL=1 GIT_CURL_VERBOSE=1 git push
 **报错**：`--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons`
 
 **原因**：claude-code cli.js 硬编码了 root 检查：
+
 ```js
-if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1)
+if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1);
 ```
 
 **修复**：设置 `IS_SANDBOX=1` 环境变量。
@@ -920,6 +922,7 @@ if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1)
 **原因**：AO 的 claude-code plugin `getEnvironment()` 只传 `CLAUDECODE`、`AO_SESSION_ID` 等少数几个变量，不继承父进程 env。tmux 的 `-e KEY=VALUE` 只传插件返回的那些，`IS_SANDBOX=1` 以及 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 都不会自动带入。
 
 **修复**：用 tmux 全局环境变量，所有新 session 自动继承：
+
 ```bash
 tmux set-environment -g IS_SANDBOX 1
 tmux set-environment -g ANTHROPIC_BASE_URL http://www.hahakaifa.cn:7892
@@ -936,6 +939,7 @@ tmux set-environment -g CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC 1
 **原因**：claude-code 第一次以 bypass 模式运行时弹 dialog，接受后写入用户设置文件跳过后续弹框。
 
 **修复**：直接预创建设置文件，跳过 dialog：
+
 ```bash
 echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 ```
@@ -949,6 +953,7 @@ echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 **原因**：`ao stop` 停了 AO manager 进程，但旧的 next-server 子进程没被 kill，继续占用 3000。
 
 **修复**：重启前先确认端口释放：
+
 ```bash
 ss -tlnp | grep 3000   # 找到占用的 PID
 kill <PID>             # 或 tmux kill-session -t ao-server
@@ -971,3 +976,58 @@ echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 ```
 
 完成后 `ao start` → `POST /api/orchestrators` 即可得到一个正常运行的 claude-code PM，无需任何手动交互。
+
+## CEO 派发标准命令
+
+这一节是给 **CEO / orchestrator operator** 的派发速查表。
+如果你的目标是稳定把 brief 发进 `ao send`，先直接照下面两步做，再看后面的原因解释。
+
+### 先执行这两步
+
+**Step 1：先把 brief 写到 `/root/<task-name>.txt`**
+
+```bash
+# 把 <task-name> 换成任务名，例如 fix-auth-bug。
+# 用 WSL 原生路径落盘；不要写 /tmp/，这次验证稳定的是 /root/。
+cat > /root/<task-name>.txt <<'EOF'
+<task description>
+EOF
+```
+
+示例：
+
+```bash
+cat > /root/fix-auth-bug.txt <<'EOF'
+Fix the auth bug in the login flow.
+Check recent changes under apps/web and packages/auth.
+Do not change public API shapes unless tests prove it is required.
+EOF
+```
+
+**Step 2：用 Python one-liner 调 `ao send`**
+
+```bash
+# 把 kit-NNN 换成真实 session ID，把 <task-name> 换成上一步的文件名。
+# Python 负责组 argv，绕过 bash 对单引号的解释；
+# [:500] 负责把发送长度压到稳定范围内，避开已知 F7 stuck input bug。
+python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/root/<task-name>.txt').read().strip()[:500]], check=True)"
+```
+
+使用时替换两处占位符：
+
+- `kit-NNN` 换成真实的 orchestrator / PM session ID
+- `/root/<task-name>.txt` 换成你的实际 brief 文件
+
+这个模板的实际含义是：**先把完整文本安全落盘，再把其前 500 个字符稳定送进 `ao send`**。
+因此最关键的目标、范围、约束要放在文件开头，不要把核心要求埋到后面。
+
+### 为什么这套写法更稳
+
+1. **消息里有单引号时，bash 很容易直接断句。** 只要 brief 里出现 `'`，shell quoting 就可能被打穿，结果不是命令报错，就是发出去的内容已经被截断。Python 这一层直接组 `argv`，不再让 bash 重解释消息正文。
+2. **长消息会撞上上游 `ao send` 的 F7 stuck input bug。** 现象通常是输入卡住、消息发不完整，或者看起来发了但目标 session 实际没有稳定吃到 dispatch。这里把发送内容压到 `[:500]`，先保证稳定送达。
+3. **临时文件路径一旦写错，WSL 侧就会直接找不到。** 这次踩坑里不要用 `/tmp/`；实测稳定路径是 `/root/`，brief 就落在 `/root/<task-name>.txt`，这样最不容易在 WSL 里路径走丢。
+
+### 什么时候可以废弃这个 workaround
+
+只要你当前使用的 AO 版本还没有包含上游 `ao send` 的修复，就继续用上面的 Python one-liner。
+等上游 `ao send` PR #50 合入、发布，并且你本机安装的版本已经确认带上该修复后，这个 Python 包装层就可以退役，再评估是否恢复成直接 `ao send`。
