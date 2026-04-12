@@ -115,6 +115,7 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 - dashboard 可见状态是权威；tmux、pstree、raw API 只能用于诊断，不能作为“其实已经在跑”的证据
 - 若 dispatch 未被验证成功，就立刻 self-heal：补发、补 Enter、重新验证；只有在真实错误、真实交付或需要新决策时才向用户升级
 - zero-backlog 仍然成立；允许推进下一个已显式存在的 canonical item，但禁止靠隐藏 backlog、memo、cache 或 state file 继续派活
+- self-heal 不是无限 retry：同一个 worker session 最多 8 个 turns（含初始 brief）；同一个 failure pattern 累计出现 3 次时，必须 kill 原 worker、spawn fresh worker，并把 failure context 写进 replacement brief / prompt
 
 ## 3. Mode C 的 brief 编写协议
 

@@ -10,12 +10,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `patches/ao-main-2ebe111a-pr-feedback-context.patch` — upstream AO patch
   that adds concrete CI/review feedback context to lifecycle auto-reroutes and
   caps review auto-feedback retries at 2 by default
+- `patches/ao-main-2ebe111a-worker-retry-loop-breaker.patch` — upstream AO
+  hotfix that adds an 8-turn worker cap, kills/respawns workers after the
+  same failure pattern appears 3 times, and injects failure context into the
+  replacement worker prompt
 
 ### Changed
 
 - `experts/general/task-splitter.md` — now makes `ci_failed` / review
   auto-routing explicit and escalates after 2 auto-feedback loops on the same
   PR
+- `FLOW.md`, `skills/ao-conductor.md`, `experts/general/task-splitter.md` —
+  retry-loop doctrine now makes the 8-turn cap and 3x identical failure
+  respawn rule explicit
 - `templates/agent-orchestrator.yaml` and `templates/project-CLAUDE.md` —
   document the 2-retry PR feedback loop expectation for project configs
 

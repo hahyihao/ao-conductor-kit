@@ -300,6 +300,12 @@ lifecycle worker 主要监控三类事件：
 如果 issue 被人工关闭，
 这条执行链就可以停止继续追踪。
 
+这里还要加一层明确的 retry-loop breaker：
+
+- 一个 worker session 最多只允许 8 个 turns，包含初始 brief 和后续 lifecycle 回派。
+- 同一个 failure pattern 如果累计出现到第 3 次，就不再继续唤醒原 worker。
+- 这时必须 kill 原 worker，respawn 一个 fresh worker，并把失败上下文注入新的 brief / prompt，让 replacement worker 不是 blind restart。
+
 reaction engine 的存在让 CEO 不必盯着每一个失败日志。
 正常情况下 CEO 只需要在节点处介入：
 决定方向、
