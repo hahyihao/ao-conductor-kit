@@ -2,7 +2,7 @@
 
 `docs/rolling-handoff.md` is the canonical PM handoff snapshot for the
 currently active round. The next PM should be able to read this file and
-continue work without replaying full git history, issue history, or
+continue work without replaying full Git history, issue history, or
 session logs.
 
 ## What this file is for
@@ -20,7 +20,7 @@ session logs.
   change that affects the next PM's decisions.
 - Before handing off, make one final pass so stale items are removed or
   marked as resolved.
-- If a fact cannot be verified from the repo, issue tracker, PR state,
+- If a fact cannot be verified from the repository, issue tracker, PR state,
   or CI, write `unknown` instead of guessing.
 - Keep the file short. Link or reference canonical issues and PRs
   instead of copying long histories into the handoff.
@@ -71,7 +71,7 @@ For each item include:
 - PR number.
 - Branch name.
 - Current state such as `open`, `review`, `changes requested`, or `CI
-  failing`.
+failing`.
 - Why the PR matters to the round.
 - The next owner action.
 
