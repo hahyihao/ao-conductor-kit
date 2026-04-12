@@ -28,6 +28,7 @@ AO 初装故障排查记录
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
+- [CEO 派发标准命令](#ceo-派发标准命令)
 
 ## Issue 1：Win10 21H1 上 `wsl --install` 无法识别
 
@@ -971,3 +972,56 @@ echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 ```
 
 完成后 `ao start` → `POST /api/orchestrators` 即可得到一个正常运行的 claude-code PM，无需任何手动交互。
+
+## CEO 派发标准命令
+
+这一节记录一个已经验证稳定的 `ao send` 派发模板。
+核心思路不是“在 shell 里直接打一大段消息”，而是先把文本落到 WSL 原生路径，再让 Python 负责把参数传给 `ao send`。
+
+### 为什么不要直接在 bash 里手敲 `ao send "..."`
+
+1. **消息里有单引号时，bash 很容易直接断句。** 只要 brief 里出现 `'`，shell quoting 就可能被打穿，结果不是命令报错，就是发出去的内容已经被截断。
+2. **长消息会撞上上游 `ao send` 的 F7 stuck input bug。** 现象通常是输入卡住、消息发不完整，或者看起来发了但目标 session 实际没有稳定吃到 dispatch。
+3. **临时文件路径一旦写错，WSL 侧就会直接找不到。** 这次踩坑里不要用 `/tmp/`；实测稳定路径是 `/root/`，brief 就落在 `/root/<task-name>.txt`。
+
+### 两步稳定模板
+
+**Step 1：先把 brief 写到 `/root/<task-name>.txt`**
+
+```bash
+# 用 WSL 原生路径落盘；不要写 /tmp/，这次验证稳定的是 /root/。
+cat > /root/<task-name>.txt <<'EOF'
+<task description>
+EOF
+```
+
+示例：
+
+```bash
+cat > /root/fix-auth-bug.txt <<'EOF'
+Fix the auth bug in the login flow.
+Check recent changes under apps/web and packages/auth.
+Do not change public API shapes unless tests prove it is required.
+EOF
+```
+
+**Step 2：用 Python one-liner 调 `ao send`**
+
+```bash
+# Python 负责组 argv，绕过 bash 对单引号的解释；
+# [:500] 负责把发送长度压到稳定范围内，避开已知 F7 stuck input bug。
+python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/root/<task-name>.txt').read().strip()[:500]], check=True)"
+```
+
+使用时替换两处占位符：
+
+- `kit-NNN` 换成真实的 orchestrator / PM session id
+- `/root/<task-name>.txt` 换成你的实际 brief 文件
+
+这个模板的实际含义是：**先把完整文本安全落盘，再把其前 500 个字符稳定送进 `ao send`**。
+因此最关键的目标、范围、约束要放在文件开头，不要把核心要求埋到后面。
+
+### 什么时候可以废弃这个 workaround
+
+只要你当前使用的 AO 版本还没有包含上游 `ao send` 的修复，就继续用上面的 Python one-liner。
+等上游 `ao send` PR #50 合入、发布，并且你本机安装的版本已经确认带上该修复后，这个 Python 包装层就可以退役，再评估是否恢复成直接 `ao send`。
