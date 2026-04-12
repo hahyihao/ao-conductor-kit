@@ -72,12 +72,12 @@ shops, skip routing, or blur boundaries, this file takes precedence.
 
 ## 2. Hub routing table
 
-| Lane | Owns | Typical entry signals | Must not absorb |
-|---|---|---|---|
-| `patrol` | Shop patrol, anomaly triage, diagnosis, health checks | Spend drops, click/ROI anomalies, unclear cause, "check what is wrong" | Direct keyword execution, product lifecycle changes, store infrastructure work |
-| `keyword` | Keyword execution and tuning | Add/tune terms, adjust match strategy, keyword-level optimization, execution after diagnosis | Storewide diagnosis, product stage decisions, shop setup work |
-| `product` | Product lifecycle operations | Listing-stage questions, item readiness, lifecycle transitions, product-level optimization requests | Store infrastructure, generic patrol work, raw keyword operations |
-| `store` | Shop setup and infrastructure | Account/shop foundation, readiness setup, operating baseline, structural prerequisites | Item lifecycle decisions, keyword tuning, patrol diagnosis unless infra is confirmed cause |
+| Lane      | Owns                                                  | Typical entry signals                                                                               | Must not absorb                                                                            |
+| --------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `patrol`  | Shop patrol, anomaly triage, diagnosis, health checks | Spend drops, click/ROI anomalies, unclear cause, "check what is wrong"                              | Direct keyword execution, product lifecycle changes, store infrastructure work             |
+| `keyword` | Keyword execution and tuning                          | Add/tune terms, adjust match strategy, keyword-level optimization, execution after diagnosis        | Storewide diagnosis, product stage decisions, shop setup work                              |
+| `product` | Product lifecycle operations                          | Listing-stage questions, item readiness, lifecycle transitions, product-level optimization requests | Store infrastructure, generic patrol work, raw keyword operations                          |
+| `store`   | Shop setup and infrastructure                         | Account/shop foundation, readiness setup, operating baseline, structural prerequisites              | Item lifecycle decisions, keyword tuning, patrol diagnosis unless infra is confirmed cause |
 
 Route to exactly one lane first. If the real fix crosses lanes, finish
 or pause the current lane, record the outcome, then hand off to the next
