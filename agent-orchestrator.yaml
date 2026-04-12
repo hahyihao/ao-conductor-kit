@@ -4,7 +4,6 @@ defaults:
   runtime: tmux
   orchestrator:
     agent: claude-code
-    model: claude-opus-4-6
   worker:
     agent: codex
   workspace: worktree
@@ -24,12 +23,14 @@ projects:
     windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: main
     sessionPrefix: kit
+    orchestrator:
+      agentConfig:
+        orchestratorModel: claude-opus-4-6
 
   ao-kit-slot-1:
     name: AO Kit Slot 1
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-1
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-1
     sessionPrefix: kit1
 
@@ -37,7 +38,6 @@ projects:
     name: AO Kit Slot 2
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-2
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-2
     sessionPrefix: kit2
 
@@ -45,7 +45,6 @@ projects:
     name: AO Kit Slot 3
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-3
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-3
     sessionPrefix: kit3
 
@@ -53,7 +52,6 @@ projects:
     name: AO Kit Slot 4
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-4
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-4
     sessionPrefix: kit4
 
@@ -61,7 +59,6 @@ projects:
     name: AO Kit Slot 5
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-5
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-5
     sessionPrefix: kit5
 
@@ -69,7 +66,6 @@ projects:
     name: AO Kit Slot 6
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-6
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-6
     sessionPrefix: kit6
 
@@ -77,7 +73,6 @@ projects:
     name: AO Kit Slot 7
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-7
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-7
     sessionPrefix: kit7
 
@@ -85,7 +80,6 @@ projects:
     name: AO Kit Slot 8
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-8
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-8
     sessionPrefix: kit8
 
@@ -93,7 +87,6 @@ projects:
     name: AO Kit Slot 9
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-9
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-9
     sessionPrefix: kit9
 
@@ -101,7 +94,6 @@ projects:
     name: AO Kit Slot 10
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-10
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-10
     sessionPrefix: kit10
 
@@ -109,7 +101,6 @@ projects:
     name: AO Kit Slot 11
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-11
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-11
     sessionPrefix: kit11
 
@@ -117,7 +108,6 @@ projects:
     name: AO Kit Slot 12
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-12
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-12
     sessionPrefix: kit12
 
@@ -125,7 +115,6 @@ projects:
     name: AO Kit Slot 13
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-13
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-13
     sessionPrefix: kit13
 
@@ -133,7 +122,6 @@ projects:
     name: AO Kit Slot 14
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-14
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-14
     sessionPrefix: kit14
 
@@ -141,7 +129,6 @@ projects:
     name: AO Kit Slot 15
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-15
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-15
     sessionPrefix: kit15
 
@@ -149,7 +136,6 @@ projects:
     name: AO Kit Slot 16
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-16
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-16
     sessionPrefix: kit16
 
@@ -157,7 +143,6 @@ projects:
     name: AO Kit Slot 17
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-17
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-17
     sessionPrefix: kit17
 
@@ -165,7 +150,6 @@ projects:
     name: AO Kit Slot 18
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-18
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-18
     sessionPrefix: kit18
 
@@ -173,7 +157,6 @@ projects:
     name: AO Kit Slot 19
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-19
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-19
     sessionPrefix: kit19
 
@@ -181,6 +164,5 @@ projects:
     name: AO Kit Slot 20
     repo: hahyihao/ao-conductor-kit
     path: /root/lanes/kit-slot-20
-    windowsMirror: /mnt/d/脚本程序/agent-orchestrator
     defaultBranch: lanes/slot-20
     sessionPrefix: kit20
