@@ -261,17 +261,6 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 3. Target file is `ARCHITECTURE.md`, `FLOW.md`, `ROADMAP.md`, or `skills/*`? → `PM-doctrine`
 4. Other, mixed, or unclear? → `PM-main`
 
-### 3.2 Pre-Delivery Checklist
-
-每次给 PM 发 `ao send` 前都必须逐条确认：
-
-- 目标消息是自然语言协调指令，不是直接把 worker 用的结构化 brief 生硬塞给 PM。
-- 目标 PM 是正确的槽；不相关工作流应去不同 slot，而不是都压到默认 PM。
-- 当前 PM context 没有过载：从最近一次 handoff / summary 算起未超过 1 小时，且当前承载批次数少于 10。
-- WSL 仍在运行，`ao status` 可见目标 PM，发送链路没有失联。
-- 消息若稍长、多行、或包含引号陷阱，优先使用本节的两步稳定模式，不要贪图 inline 快捷。
-- 发送后 10 秒内必须完成验证：先看 dashboard，再 peek pane，最后跑 `ao status` / GitHub，确认目标出现 `Working` 或其它 present signal。
-
 ### 3.3 稳定发送两步法
 
 推荐固定走两步：
@@ -571,3 +560,94 @@ gh auth setup-git
 最后再提醒一次：你是 CEO，不是默认执行者。
 你的价值在于判断是否该派活、写出高质量 brief、追踪 workers、审阅 PR、推动下一轮迭代。
 但当任务明显不值得 dispatch 时，你也要果断回到直接处理，不要把 AO 变成形式主义。
+
+## Example Workflow
+
+下面给一个完整示例。假设用户说：“给 dashboard component 加 dark-mode。”
+1. 先做 Mode 判断。
+   - 这是交付型改动，不是解释型问题，所以不走 Mode A。
+   - 目标集中在 dashboard UI，一条实现链通常就够，所以先选 `Mode B — single worker`。
+   - 只有当你现场确认它实际拆成 3 个以上互不重叠的独立子任务时，才升级到 Mode C。
+2. 先检查环境是否能 dispatch。
+   ```bash
+   wsl -l -v
+   ao --version
+   codex --version
+   test -f agent-orchestrator.yaml && echo ok
+   ao status
+   ```
+   - 只有 `Ubuntu-22.04`、AO、Codex、`agent-orchestrator.yaml` 和 running orchestrator 都正常时才继续。
+3. 选择 PM 路由。
+   - 目标是 dashboard 组件代码，不属于 `experts/`、`.github/`、`tools/` 或 `skills/*`，所以先路由到 `PM-main`。
+   - 目标 session 是 `kit-orchestrator-23`；如果这个 slot 不健康或过载，就先换健康 idle slot。
+4. 先写给 PM 的自然语言 brief。
+   ```bash
+   cat >"/root/dashboard-dark-mode.txt" <<'EOF'
+   请接手一个 dashboard UI 改动。目标是在现有 dashboard component 上补 dark-mode 支持。
+   先检查 dashboard 组件、主题入口和现有样式约定，再决定是单 worker 直做还是继续向下拆分。
+   约束：只处理 dashboard 相关文件，不要顺手改全站主题。
+   验收：dark theme 下可读、无明显样式回退、不改无关页面，PR 描述写清验证步骤。
+   EOF
+   ```
+   - 这条消息是发给 PM 的协调指令，不是直接发给 worker 的最终 brief。
+5. 用两步稳定模式发送 `ao send`。
+   ```bash
+   python3 -c "from pathlib import Path; import subprocess; subprocess.run(['ao','send','kit-orchestrator-23', Path('/root/dashboard-dark-mode.txt').read_text().strip()[:500]], check=True)"
+   ```
+6. 做 10 秒验证。
+   ```bash
+   tmux capture-pane -pt kit-orchestrator-23 | tail -n 40
+   ao status
+   ```
+   - 你要确认目标 session 出现新的 present signal，例如 `Working`、新 branch 或 issue / PR activity。
+   - 如果 pane 还停在旧输出、`ao status` 没变化、或 `ao send` 卡住，就立刻补 Enter、重发或回到 Python 两步法。
+7. 进入监控。
+   ```bash
+   ao status
+   gh pr list --repo <owner/repo>
+   ```
+   - 对用户汇报紧凑摘要，例如：PM 已接单、worker 已开分支、PR `#NNN` 已创建、CI 正在跑。
+   - 如果 session 长时间无活动、PR 没出现、或 CI 卡住，就按监控协议升级处理，不要放着不看。
+8. 做 review 并 merge。
+   ```bash
+   gh pr view NNN --repo <owner/repo>
+   gh pr diff NNN --repo <owner/repo>
+   gh pr merge NNN --repo <owner/repo> --squash --delete-branch
+   ```
+   - 先确认改动聚焦在 dashboard 相关路径，真的覆盖了 dark-mode，没有越界修改。
+   - reviewer / CI 都通过后再 merge，并向用户汇报 PR `#NNN` 已合并、branch 已清理、AO 池是否空闲。
+
+## Tips for Better Results
+
+### Brief writing tips
+
+- 把目标文件路径、组件名和主题入口写死，不要只写“改 dashboard 相关代码”这种模糊描述。
+- 把验收写成可检查结果，例如“dark theme 下文本可读、hover/focus 不丢失”，不要只写“支持 dark-mode”。
+- 明确边界：只改 dashboard，不顺手改全站 theme system，也不要扩成无关重构。
+- 把验证步骤写进 brief，包括要跑的命令、要看的页面、要附的 evidence。
+- 如果 worker 看不到主对话就会丢信息，说明 brief 还不够 self-contained。
+
+### Common dispatch sticking points
+
+- `ao send` 卡住、吞消息或被 quoting 吃掉：回到 §3.3 的 Python 两步法，不要继续试复杂 inline quoting。
+- worker / PM 长时间沉默：先跑 `ao status`，再用 `tmux capture-pane` 看 present signal，不要把旧输出当成正在运行。
+- dashboard、pane 和 `ao status` 对不上：按 §2.3 先做 self-heal，再重新验证，不要凭感觉认定已经派发成功。
+- PM 接单后迟迟不开 branch / issue / PR：先检查 brief 是否太模糊，再检查 PM context 是否已经过载。
+- 你很想把多个任务都塞给一个熟悉的 PM：按 §10 拒绝这种做法，改走 PM pool 或等待健康 idle slot。
+
+### When NOT to dispatch
+
+- 像 §10 里的单文件 typo、小范围直改，直接走 Mode A；不要为了流程感强行起 AO。
+- 像 §10 里的解释型问题或互动式调试，直接回答或继续现场观察；dispatch 只会拖慢反馈循环。
+- 当前目录还不具备 Git / remote / orchestrator 这些前提时，先补环境；不要假装 dispatch 已经可用。
+
+## Pre-Delivery Checklist
+
+每次给 PM 发 `ao send` 前都必须逐条确认：
+
+- 目标消息是自然语言协调指令，不是直接把 worker 用的结构化 brief 生硬塞给 PM。
+- 目标 PM 是正确的槽；不相关工作流应去不同 slot，而不是都压到默认 PM。
+- 当前 PM context 没有过载：从最近一次 handoff / summary 算起未超过 1 小时，且当前承载批次数少于 10。
+- WSL 仍在运行，`ao status` 可见目标 PM，发送链路没有失联。
+- 消息若稍长、多行、或包含引号陷阱，优先使用本节的两步稳定模式，不要贪图 inline 快捷。
+- 发送后 10 秒内必须完成验证：先看 dashboard，再 peek pane，最后跑 `ao status` / GitHub，确认目标出现 `Working` 或其它 present signal。
