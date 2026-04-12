@@ -24,6 +24,7 @@ AO 初装故障排查记录
 - [Issue 12：ao session kill 不清 worktree，新 worker 因 Git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
 - [Issue 13：orchestrator 启动时出现 Windows PATH 污染 warning](#issue-13orchestrator-启动时出现-windows-path-污染-warning)
 - [Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端](#issue-14ao-webapi-假死实为卡住的-gh-api-graphql-拖住-nextjs-服务端)
+- [Issue 15：PM 上下文逼近 85% 仍继续派活，导致状态漂移和静默降级](#issue-15pm-上下文逼近-85-仍继续派活导致状态漂移和静默降级)
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
@@ -702,6 +703,62 @@ ps -eo pid,etime,command | grep -E 'next-server|node .*next' | grep -v grep
 2. 诊断时把"服务进程是否还活着"和"服务内部是否有阻塞子进程"分开看，不要把两者混成一个问题。
 3. 运维值守时保留一条现成命令：`ps -eo pid,ppid,etime,stat,command | grep 'gh api graphql' | grep -v grep`，能比盲目重启更快定位真因。
 4. 只有在确认 next-server 自己已经退出、崩溃，或杀掉卡住的 `gh api graphql` 后仍然完全无响应时，才继续排查 Next.js 本身。
+
+## Issue 15：PM 上下文逼近 85% 仍继续派活，导致状态漂移和静默降级
+
+### 现象
+
+orchestrator / PM session 看起来还活着，`ao status` 也未必报错，但它开始出现几类危险信号：
+
+- 回报越来越泛，开始依赖“按之前讨论”
+- 漏掉仍未完成的 pending 项，或把已完成事项重新当成待办
+- 对 issue、branch、PR、session 的映射说法前后不一致
+- 下一步建议突然变得模糊，像是在凭残存印象硬撑
+
+这类情况最危险的地方在于：它不像 tmux crash 那样直接死掉，而是会继续输出看似正常的话，导致 CEO 误以为流程还能稳态推进。
+
+### 根因
+
+长寿命 PM 会话接近上下文上限后，常见问题不是“完全不能回答”，而是工作记忆开始被压缩。若此时没有一个强制停点，PM 就会在保留部分表面状态的同时丢掉关键执行细节，形成静默降级。真正坏掉的是状态一致性，不一定是进程存活。
+
+### 修复
+
+把 `85%` 左右当成强制黄线，不要等到彻底压缩后才处理。只要出现下面任一条件，就立即暂停继续派发：
+
+- client 或 UI 显示上下文已接近 `85%`
+- pane / 模型提示出现 compaction、`Context compressed` 或类似警告
+- PM 已无法稳定复述当前计划、pending 项和最早仍相关的 CEO 指令
+
+触发后按固定顺序执行：
+
+1. 先停止往同一个 PM 继续塞新 brief、review 或 follow-up 指令。
+2. 让 PM 先写 state summary；如果已有活动 plan 文档，同步把 summary 写进对应 `briefs/plans/...`。
+3. summary 至少包含：当前目标、当前 mode / plan 文档、已完成项、在途 worker/issue/PR/branch/session、剩余 pending、风险阻塞、下一步最安全动作。
+4. 再决定是 handoff 给新的 PM，还是明确告诉当前 PM“基于这份 summary 继续”。
+
+可直接采用下面这个最小模板：
+
+```md
+[CONTEXT-WARNING 85%]
+State summary:
+
+- Goal:
+- Mode / plan doc:
+- Completed:
+- In flight:
+- Pending:
+- Risks / blockers:
+- Next safe action:
+```
+
+如果 summary 已经含糊到只能写“按之前讨论”，或者你已经看到明显记忆漂移，不要再让同一个 PM 继续硬撑，直接走 handoff / replacement。
+
+### 预防
+
+1. 把“PM 还活着”和“PM 状态还一致”分开看。前者只是进程健康，后者才是可继续调度的前提。
+2. `85%` 是预警线，不是建议线。看到信号就暂停，不要赌剩下那一点上下文还能顶多久。
+3. 要求 PM 把状态写成结构化 summary，而不是一段模糊近况；没有结构化 handoff，就很难验证有没有漏状态。
+4. 任何继续使用原 PM 的决定，都应该显式引用最新 summary 作为事实基线，不要再说“继续上一个话题”。
 
 ## 误诊链路（历史记录）
 
