@@ -1,0 +1,643 @@
+diff --git a/packages/core/src/__tests__/lifecycle-manager.test.ts b/packages/core/src/__tests__/lifecycle-manager.test.ts
+index 1298d9ed..3cb04890 100644
+--- a/packages/core/src/__tests__/lifecycle-manager.test.ts
++++ b/packages/core/src/__tests__/lifecycle-manager.test.ts
+@@ -604,6 +604,126 @@ describe("reactions", () => {
+     expect(notifier.notify).not.toHaveBeenCalled();
+   });
+ 
++  it("kills and respawns a worker when the next retry would exceed the 8-turn cap", async () => {
++    config.reactions = {
++      "changes-requested": {
++        auto: true,
++        action: "send-to-agent",
++        message: "Handle requested changes.",
++      },
++    };
++
++    const mockSCM = createMockSCM({
++      getReviewDecision: vi.fn().mockResolvedValue("changes_requested"),
++    });
++    const registry = createMockRegistry({
++      runtime: plugins.runtime,
++      agent: plugins.agent,
++      scm: mockSCM,
++    });
++
++    vi.mocked(mockSessionManager.send).mockResolvedValue(undefined);
++    vi.mocked(mockSessionManager.spawn).mockResolvedValue(
++      makeSession({ id: "app-2", issueId: "133", branch: "feat/133" }),
++    );
++
++    const lm = setupCheck("app-1", {
++      session: makeSession({
++        status: "review_pending",
++        issueId: "133",
++        branch: "feat/133",
++        pr: makePR({ branch: "feat/133" }),
++        metadata: { workerTurnCount: "8" },
++      }),
++      metaOverrides: { workerTurnCount: "8" },
++      registry,
++    });
++
++    await lm.check("app-1");
++
++    expect(mockSessionManager.send).not.toHaveBeenCalled();
++    expect(mockSessionManager.kill).toHaveBeenCalledWith("app-1");
++    expect(mockSessionManager.spawn).toHaveBeenCalledWith(
++      expect.objectContaining({
++        projectId: "my-app",
++        issueId: "133",
++        branch: "feat/133",
++      }),
++    );
++    const replacementPrompt = vi.mocked(mockSessionManager.spawn).mock.calls[0]?.[0]?.prompt;
++    expect(replacementPrompt).toContain("8-turn cap");
++    expect(replacementPrompt).toContain("replacing worker session app-1");
++    expect(mockSessionManager.claimPR).toHaveBeenCalledWith("app-2", makePR().url);
++  });
++
++  it("kills and respawns a worker when the same CI failure pattern appears three times", async () => {
++    config.reactions = {
++      "ci-failed": {
++        auto: true,
++        action: "send-to-agent",
++        message: "CI is failing. Fix it.",
++        retries: 3,
++        escalateAfter: 3,
++      },
++    };
++
++    const mockSCM = createMockSCM({
++      getCISummary: vi.fn().mockResolvedValue("failing"),
++      getCIChecks: vi.fn().mockResolvedValue([
++        { name: "lint", status: "failed", conclusion: "FAILURE" },
++      ]),
++    });
++    const registry = createMockRegistry({
++      runtime: plugins.runtime,
++      agent: plugins.agent,
++      scm: mockSCM,
++    });
++
++    vi.mocked(mockSessionManager.send).mockResolvedValue(undefined);
++    vi.mocked(mockSessionManager.spawn).mockResolvedValue(
++      makeSession({ id: "app-2", issueId: "133", branch: "feat/133" }),
++    );
++
++    const lm = setupCheck("app-1", {
++      session: makeSession({
++        status: "ci_failed",
++        issueId: "133",
++        branch: "feat/133",
++        pr: makePR({ branch: "feat/133" }),
++        metadata: {
++          workerTurnCount: "4",
++          lastFailurePattern: "lint:failed:FAILURE",
++          lastFailurePatternCount: "2",
++          lastCIFailureFingerprint: "lint:failed:FAILURE",
++        },
++      }),
++      metaOverrides: {
++        workerTurnCount: "4",
++        lastFailurePattern: "lint:failed:FAILURE",
++        lastFailurePatternCount: "2",
++        lastCIFailureFingerprint: "lint:failed:FAILURE",
++      },
++      registry,
++    });
++
++    await lm.check("app-1");
++
++    expect(mockSessionManager.send).not.toHaveBeenCalled();
++    expect(mockSessionManager.kill).toHaveBeenCalledWith("app-1");
++    expect(mockSessionManager.spawn).toHaveBeenCalledWith(
++      expect.objectContaining({
++        projectId: "my-app",
++        issueId: "133",
++        branch: "feat/133",
++      }),
++    );
++    const replacementPrompt = vi.mocked(mockSessionManager.spawn).mock.calls[0]?.[0]?.prompt;
++    expect(replacementPrompt).toContain("same failure pattern repeated 3 times");
++    expect(replacementPrompt).toContain("CI checks are failing on your PR");
++    expect(replacementPrompt).toContain("lint");
++    expect(mockSessionManager.claimPR).toHaveBeenCalledWith("app-2", makePR().url);
++  });
++
+   it("dispatches unresolved review comments even when reviewDecision stays unchanged", async () => {
+     config.reactions = {
+       "changes-requested": {
+diff --git a/packages/core/src/__tests__/prompt-builder.test.ts b/packages/core/src/__tests__/prompt-builder.test.ts
+index 7d775bae..d5253da8 100644
+--- a/packages/core/src/__tests__/prompt-builder.test.ts
++++ b/packages/core/src/__tests__/prompt-builder.test.ts
+@@ -215,5 +215,7 @@ describe("BASE_AGENT_PROMPT", () => {
+     expect(BASE_AGENT_PROMPT).toContain("Git Workflow");
+     expect(BASE_AGENT_PROMPT).toContain("PR Best Practices");
+     expect(BASE_AGENT_PROMPT).toContain("ao session claim-pr");
++    expect(BASE_AGENT_PROMPT).toContain("hard cap of 8 total turns");
++    expect(BASE_AGENT_PROMPT).toContain("failure pattern repeats 3 times");
+   });
+ });
+diff --git a/packages/core/src/lifecycle-manager.ts b/packages/core/src/lifecycle-manager.ts
+index 613d8615..83da392c 100644
+--- a/packages/core/src/lifecycle-manager.ts
++++ b/packages/core/src/lifecycle-manager.ts
+@@ -35,6 +35,8 @@ import {
+   type ProjectConfig as _ProjectConfig,
+   type PREnrichmentData,
+   type CICheck,
++  type ReviewComment,
++  type AutomatedComment,
+ } from "./types.js";
+ import { updateMetadata } from "./metadata.js";
+ import { getSessionsDir } from "./paths.js";
+@@ -191,6 +193,10 @@ interface ReactionTracker {
+   firstTriggered: Date;
+ }
+ 
++const MAX_WORKER_TURNS = 8;
++const MAX_IDENTICAL_FAILURE_PATTERN_OCCURRENCES = 3;
++const MAX_FAILURE_CONTEXT_CHARS = 6_000;
++
+ /** Create a LifecycleManager instance. */
+ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleManager {
+   const { config, registry, sessionManager, projectId: scopedProjectId } = deps;
+@@ -198,6 +204,7 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+ 
+   const states = new Map<SessionId, SessionStatus>();
+   const reactionTrackers = new Map<string, ReactionTracker>(); // "sessionId:reactionKey"
++  const replacedSessions = new Set<SessionId>();
+   let pollTimer: ReturnType<typeof setInterval> | null = null;
+   let polling = false; // re-entrancy guard
+   let allCompleteEmitted = false; // guard against repeated all_complete
+@@ -572,6 +579,12 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+     projectId: string,
+     reactionKey: string,
+     reactionConfig: ReactionConfig,
++    options?: {
++      session?: Session;
++      failurePattern?: string;
++      failureContext?: string;
++      messageOverride?: string;
++    },
+   ): Promise<ReactionResult> {
+     const trackerKey = `${sessionId}:${reactionKey}`;
+     let tracker = reactionTrackers.get(trackerKey);
+@@ -626,19 +639,29 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+ 
+     switch (action) {
+       case "send-to-agent": {
+-        if (reactionConfig.message) {
+-          try {
+-            await sessionManager.send(sessionId, reactionConfig.message);
++        const message = options?.messageOverride ?? reactionConfig.message;
++        if (message) {
++          if (options?.session) {
++            return sendToAgentWithLoopGuard({
++              session: options.session,
++              reactionKey,
++              reactionConfig,
++              message,
++              failurePattern: options.failurePattern,
++              failureContext: options.failureContext,
++            });
++          }
+ 
++          try {
++            await sessionManager.send(sessionId, message);
+             return {
+               reactionType: reactionKey,
+               success: true,
+               action: "send-to-agent",
+-              message: reactionConfig.message,
++              message,
+               escalated: false,
+             };
+           } catch {
+-            // Send failed — allow retry on next poll cycle (don't escalate immediately)
+             return {
+               reactionType: reactionKey,
+               success: false,
+@@ -733,10 +756,235 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+     session.metadata = cleaned;
+   }
+ 
++  function clearSessionReactionTrackers(sessionId: SessionId): void {
++    for (const trackerKey of [...reactionTrackers.keys()]) {
++      if (trackerKey.startsWith(`${sessionId}:`)) {
++        reactionTrackers.delete(trackerKey);
++      }
++    }
++  }
++
++  function parseCounter(raw: string | undefined, fallback: number): number {
++    const parsed = Number.parseInt(raw ?? "", 10);
++    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
++  }
++
++  function getWorkerTurnCount(session: Session): number {
++    return parseCounter(session.metadata["workerTurnCount"], 1);
++  }
++
++  function trimFailureContext(context: string): string {
++    if (context.length <= MAX_FAILURE_CONTEXT_CHARS) {
++      return context;
++    }
++    return `${context.slice(0, MAX_FAILURE_CONTEXT_CHARS)}\n\n[truncated]`;
++  }
++
++  function buildReplacementPrompt(
++    session: Session,
++    params: {
++      reason: string;
++      failureContext: string;
++    },
++  ): string {
++    const branch = session.pr?.branch ?? session.branch ?? `session/${session.id}`;
++    const prLine = session.pr ? `- Existing PR: ${session.pr.url}` : "- No PR is attached yet.";
++    return [
++      `You are replacing worker session ${session.id}.`,
++      "",
++      "The lifecycle worker killed the previous session to break a stuck retry loop.",
++      `Loop-breaker reason: ${params.reason}.`,
++      `- Continue on branch: ${branch}`,
++      prLine,
++      "",
++      "Failure context from the previous worker session:",
++      params.failureContext,
++      "",
++      "Replacement-worker rules:",
++      "- Read the existing branch and workspace state before changing code.",
++      "- Treat the failure context above as required debugging input, not background noise.",
++      "- Do not blindly repeat the previous attempt.",
++      "- Keep the implementation on the existing issue/branch/PR line.",
++    ].join("\n");
++  }
++
++  async function respawnSessionForLoopBreaker(params: {
++    session: Session;
++    reactionKey: string;
++    reactionConfig: ReactionConfig;
++    reason: string;
++    failureContext: string;
++  }): Promise<ReactionResult> {
++    const { session, reactionKey, reactionConfig, reason } = params;
++
++    if (replacedSessions.has(session.id)) {
++      return {
++        reactionType: reactionKey,
++        success: true,
++        action: "respawned",
++        message: reason,
++        escalated: false,
++      };
++    }
++
++    replacedSessions.add(session.id);
++    const replacementPrompt = buildReplacementPrompt(session, {
++      reason,
++      failureContext: trimFailureContext(params.failureContext),
++    });
++    const replacementBranch = session.pr?.branch ?? session.branch ?? `session/${session.id}`;
++
++    try {
++      await sessionManager.kill(session.id);
++      states.set(session.id, SESSION_STATUS.KILLED);
++      clearSessionReactionTrackers(session.id);
++      lastReviewBacklogCheckAt.delete(session.id);
++
++      const replacement = await sessionManager.spawn({
++        projectId: session.projectId,
++        ...(session.issueId ? { issueId: session.issueId } : {}),
++        branch: replacementBranch,
++        prompt: replacementPrompt,
++      });
++
++      if (session.pr) {
++        await sessionManager.claimPR(replacement.id, session.pr.url);
++      }
++
++      return {
++        reactionType: reactionKey,
++        success: true,
++        action: "respawned",
++        message: reason,
++        escalated: false,
++      };
++    } catch (err) {
++      const errorMessage = err instanceof Error ? err.message : String(err);
++      const event = createEvent("reaction.escalated", {
++        sessionId: session.id,
++        projectId: session.projectId,
++        message: `Retry-loop breaker failed for ${session.id}: ${errorMessage}`,
++        data: {
++          reactionKey,
++          reason,
++          error: errorMessage,
++        },
++      });
++      await notifyHuman(event, reactionConfig.priority ?? "urgent");
++      return {
++        reactionType: reactionKey,
++        success: false,
++        action: "respawn-failed",
++        message: errorMessage,
++        escalated: true,
++      };
++    }
++  }
++
++  async function sendToAgentWithLoopGuard(params: {
++    session: Session;
++    reactionKey: string;
++    reactionConfig: ReactionConfig;
++    message: string;
++    failurePattern?: string;
++    failureContext?: string;
++  }): Promise<ReactionResult> {
++    const { session, reactionKey, reactionConfig, message, failurePattern, failureContext } = params;
++    const currentTurnCount = getWorkerTurnCount(session);
++    const nextTurnCount = currentTurnCount + 1;
++    const previousPatternCount =
++      failurePattern && session.metadata["lastFailurePattern"] === failurePattern
++        ? parseCounter(session.metadata["lastFailurePatternCount"], 0)
++        : 0;
++    const nextPatternCount = failurePattern ? previousPatternCount + 1 : 0;
++
++    const reasons: string[] = [];
++    if (nextTurnCount > MAX_WORKER_TURNS) {
++      reasons.push(
++        `worker exceeded the ${MAX_WORKER_TURNS}-turn cap (${currentTurnCount} completed turns)`,
++      );
++    }
++    if (failurePattern && nextPatternCount >= MAX_IDENTICAL_FAILURE_PATTERN_OCCURRENCES) {
++      reasons.push(
++        `the same failure pattern repeated ${nextPatternCount} times`,
++      );
++    }
++
++    if (reasons.length > 0) {
++      return respawnSessionForLoopBreaker({
++        session,
++        reactionKey,
++        reactionConfig,
++        reason: reasons.join(" and "),
++        failureContext: failureContext ?? message,
++      });
++    }
++
++    try {
++      await sessionManager.send(session.id, message);
++      const updates: Partial<Record<string, string>> = {
++        workerTurnCount: String(nextTurnCount),
++      };
++      if (failurePattern) {
++        updates["lastFailurePattern"] = failurePattern;
++        updates["lastFailurePatternCount"] = String(nextPatternCount);
++        updates["lastFailureContext"] = trimFailureContext(failureContext ?? message);
++      }
++      updateSessionMetadata(session, updates);
++
++      return {
++        reactionType: reactionKey,
++        success: true,
++        action: "send-to-agent",
++        message,
++        escalated: false,
++      };
++    } catch {
++      return {
++        reactionType: reactionKey,
++        success: false,
++        action: "send-to-agent",
++        escalated: false,
++      };
++    }
++  }
++
+   function makeFingerprint(ids: string[]): string {
+     return [...ids].sort().join(",");
+   }
+ 
++  function formatReviewCommentsMessage(comments: ReviewComment[]): string {
++    const lines = [
++      "Review changes are still required on your PR. Address these unresolved comments:",
++      "",
++    ];
++    for (const comment of comments) {
++      const location = comment.path
++        ? ` (${comment.path}${comment.line ? `:${comment.line}` : ""})`
++        : "";
++      lines.push(`- ${comment.author}${location}: ${comment.body} — ${comment.url}`);
++    }
++    lines.push("", "Resolve every comment, push updates, and reply on the PR.");
++    return lines.join("\n");
++  }
++
++  function formatAutomatedReviewMessage(comments: AutomatedComment[]): string {
++    const lines = [
++      "Automated review findings are still open on your PR. Address these findings:",
++      "",
++    ];
++    for (const comment of comments) {
++      const location = comment.path
++        ? ` (${comment.path}${comment.line ? `:${comment.line}` : ""})`
++        : "";
++      lines.push(
++        `- [${comment.severity}] ${comment.botName}${location}: ${comment.body} — ${comment.url}`,
++      );
++    }
++    lines.push("", "Fix the findings, push updates, and confirm the bots are satisfied.");
++    return lines.join("\n");
++  }
++
+   async function maybeDispatchReviewBacklog(
+     session: Session,
+     oldStatus: SessionStatus,
+@@ -855,8 +1103,16 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+             session.projectId,
+             humanReactionKey,
+             reactionConfig,
++            {
++              session,
++              failurePattern: pendingFingerprint,
++              failureContext: formatReviewCommentsMessage(pendingComments),
++            },
+           );
+           if (result.success) {
++            if (result.action === "respawned") {
++              return;
++            }
+             updateSessionMetadata(session, {
+               lastPendingReviewDispatchHash: pendingFingerprint,
+               lastPendingReviewDispatchAt: new Date().toISOString(),
+@@ -901,8 +1157,16 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+             session.projectId,
+             automatedReactionKey,
+             reactionConfig,
++            {
++              session,
++              failurePattern: automatedFingerprint,
++              failureContext: formatAutomatedReviewMessage(automatedComments),
++            },
+           );
+           if (result.success) {
++            if (result.action === "respawned") {
++              return;
++            }
+             updateSessionMetadata(session, {
+               lastAutomatedReviewDispatchHash: automatedFingerprint,
+               lastAutomatedReviewDispatchAt: new Date().toISOString(),
+@@ -1044,7 +1308,20 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+ 
+       try {
+         if (reactionConfig.action === "send-to-agent") {
+-          await sessionManager.send(session.id, detailedMessage);
++          const result = await sendToAgentWithLoopGuard({
++            session,
++            reactionKey: ciReactionKey,
++            reactionConfig,
++            message: detailedMessage,
++            failurePattern: ciFingerprint,
++            failureContext: detailedMessage,
++          });
++          if (!result.success) {
++            return;
++          }
++          if (result.action === "respawned") {
++            return;
++          }
+         } else {
+           // For "notify" action, send to human notifiers instead
+           const event = createEvent("ci.failing", {
+@@ -1143,7 +1420,20 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+             const message =
+               reactionConfig.message ??
+               "Your branch has merge conflicts. Rebase on the default branch and resolve them.";
+-            await sessionManager.send(session.id, message);
++            const result = await sendToAgentWithLoopGuard({
++              session,
++              reactionKey: conflictReactionKey,
++              reactionConfig,
++              message,
++              failurePattern: "merge-conflicts",
++              failureContext: message,
++            });
++            if (!result.success) {
++              return;
++            }
++            if (result.action === "respawned") {
++              return;
++            }
+           } else {
+             const event = createEvent("merge.conflicts", {
+               sessionId: session.id,
+@@ -1247,6 +1537,7 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+                 session.projectId,
+                 reactionKey,
+                 reactionConfig,
++                { session },
+               );
+               transitionReaction = { key: reactionKey, result: reactionResult };
+               // Reaction is handling this event — suppress immediate human notification.
+@@ -1277,6 +1568,10 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+       states.set(session.id, newStatus);
+     }
+ 
++    if (replacedSessions.has(session.id)) {
++      return;
++    }
++
+     // Pin first quality summary for title stability
+     if (
+       session.agentInfo?.summary &&
+@@ -1293,11 +1588,29 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+       }
+     }
+ 
+-    await Promise.allSettled([
+-      maybeDispatchReviewBacklog(session, oldStatus, newStatus, transitionReaction),
+-      maybeDispatchCIFailureDetails(session, oldStatus, newStatus, transitionReaction),
+-      maybeDispatchMergeConflicts(session, newStatus),
+-    ]);
++    try {
++      await maybeDispatchReviewBacklog(session, oldStatus, newStatus, transitionReaction);
++    } catch {
++      void 0;
++    }
++    if (replacedSessions.has(session.id)) {
++      return;
++    }
++
++    try {
++      await maybeDispatchCIFailureDetails(session, oldStatus, newStatus, transitionReaction);
++    } catch {
++      void 0;
++    }
++    if (replacedSessions.has(session.id)) {
++      return;
++    }
++
++    try {
++      await maybeDispatchMergeConflicts(session, newStatus);
++    } catch {
++      void 0;
++    }
+   }
+ 
+   /** Run one polling cycle across all sessions. */
+@@ -1346,6 +1659,11 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+           lastReviewBacklogCheckAt.delete(sessionId);
+         }
+       }
++      for (const sessionId of [...replacedSessions]) {
++        if (!currentSessionIds.has(sessionId)) {
++          replacedSessions.delete(sessionId);
++        }
++      }
+ 
+       // Check if all sessions are complete (trigger reaction only once)
+       const activeSessions = sessions.filter((s) => !TERMINAL_STATUSES.has(s.status));
+diff --git a/packages/core/src/prompt-builder.ts b/packages/core/src/prompt-builder.ts
+index eb0a972f..56ac9e23 100644
+--- a/packages/core/src/prompt-builder.ts
++++ b/packages/core/src/prompt-builder.ts
+@@ -23,6 +23,8 @@ export const BASE_AGENT_PROMPT = `You are an AI coding agent managed by the Agen
+ ## Session Lifecycle
+ - You are running inside a managed session. Focus on the assigned task.
+ - When you finish your work, create a PR and push it. The orchestrator will handle CI monitoring and review routing.
++- Each worker session has a hard cap of 8 total turns, including the initial brief.
++- If the same CI/review failure pattern repeats 3 times, the orchestrator may kill this session and respawn a fresh worker with the failure context injected.
+ - If you're told to take over or continue work on an existing PR, run \`ao session claim-pr <pr-number-or-url>\` from inside this session before making changes.
+ - If CI fails, the orchestrator will send you the failures — fix them and push again.
+ - If reviewers request changes, the orchestrator will forward their comments — address each one, push fixes, and reply to the comments.
+diff --git a/packages/core/src/session-manager.ts b/packages/core/src/session-manager.ts
+index 04296e20..e21a380d 100644
+--- a/packages/core/src/session-manager.ts
++++ b/packages/core/src/session-manager.ts
+@@ -1167,6 +1167,7 @@ export function createSessionManager(deps: SessionManagerDeps): OpenCodeSessionM
+         createdAt: new Date().toISOString(),
+         runtimeHandle: JSON.stringify(handle),
+         opencodeSessionId: reusedOpenCodeSessionId,
++        workerTurnCount: "1",
+       });
+ 
+       if (plugins.agent.postLaunchSetup) {
+diff --git a/packages/core/src/types.ts b/packages/core/src/types.ts
+index b7d926bb..221478f7 100644
+--- a/packages/core/src/types.ts
++++ b/packages/core/src/types.ts
+@@ -1374,6 +1374,10 @@ export interface SessionMetadata {
+   directTerminalWsPort?: number;
+   opencodeSessionId?: string;
+   pinnedSummary?: string; // First quality summary, pinned for display stability
++  workerTurnCount?: string;
++  lastFailurePattern?: string;
++  lastFailurePatternCount?: string;
++  lastFailureContext?: string;
+ }
+ 
+ // =============================================================================

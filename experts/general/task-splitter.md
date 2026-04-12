@@ -318,6 +318,8 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
   concrete failure context (failed check names/URLs or comment path/body/URL),
   and PM MUST keep the PR bound to the same worker while that loop is active.
 - **CI or review feedback loops past 2 auto-reroutes on the same PR**: stop the self-heal loop, escalate to CEO with the failure summary, the latest rerouted context, and whether the brief/architecture now appears wrong.
+- **A worker reaches 8 total turns in one session**: stop reviving that session. Kill it, spawn a fresh worker on the same issue / branch / PR line, and inject the current failure context into the replacement brief so the new worker does not restart blind.
+- **The same CI / review / merge-conflict failure pattern appears 3 times on one worker**: stop the loop on that session. Kill the worker, respawn a fresh worker, and carry the failure context forward explicitly. Only escalate to CEO if the replacement worker cannot be created cleanly.
 - **Expert scout cannot find a source for a requested domain**: mark the discovery-queue entry as `blocked`, escalate to CEO with a human-readable explanation of what is needed.
 - **Architect produces conflicting ADRs**: escalate to CEO, do not pick one yourself.
 - **Your own context budget approaches the warning threshold (~85%)**: stop new dispatch/review work, write the state summary from §10.1, send it to CEO, and recommend replacement or explicit continuation.
