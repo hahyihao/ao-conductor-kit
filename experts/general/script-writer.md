@@ -108,7 +108,7 @@ below apply.
 
 - `task-splitter` routes shell, bootstrap, installer, CI helper, and
   operator automation tasks to `script-writer`.
-- `script-writer` works closely with `env-ops` when git workflow,
+- `script-writer` works closely with `env-ops` when Git workflow,
   worktree management, or environment setup is part of the job.
 - When the task becomes mostly product code rather than automation,
   hand off to `code-writer`.
