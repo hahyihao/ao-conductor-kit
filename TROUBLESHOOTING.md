@@ -975,20 +975,15 @@ echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 
 ## CEO 派发标准命令
 
-这一节记录一个已经验证稳定的 `ao send` 派发模板。
-核心思路不是“在 shell 里直接打一大段消息”，而是先把文本落到 WSL 原生路径，再让 Python 负责把参数传给 `ao send`。
+这一节是给 **CEO / orchestrator operator** 的派发速查表。
+如果你的目标是稳定把 brief 发进 `ao send`，先直接照下面两步做，再看后面的原因解释。
 
-### 为什么不要直接在 bash 里手敲 `ao send "..."`
-
-1. **消息里有单引号时，bash 很容易直接断句。** 只要 brief 里出现 `'`，shell quoting 就可能被打穿，结果不是命令报错，就是发出去的内容已经被截断。
-2. **长消息会撞上上游 `ao send` 的 F7 stuck input bug。** 现象通常是输入卡住、消息发不完整，或者看起来发了但目标 session 实际没有稳定吃到 dispatch。
-3. **临时文件路径一旦写错，WSL 侧就会直接找不到。** 这次踩坑里不要用 `/tmp/`；实测稳定路径是 `/root/`，brief 就落在 `/root/<task-name>.txt`。
-
-### 两步稳定模板
+### 先执行这两步
 
 **Step 1：先把 brief 写到 `/root/<task-name>.txt`**
 
 ```bash
+# 把 <task-name> 换成任务名，例如 fix-auth-bug。
 # 用 WSL 原生路径落盘；不要写 /tmp/，这次验证稳定的是 /root/。
 cat > /root/<task-name>.txt <<'EOF'
 <task description>
@@ -1008,6 +1003,7 @@ EOF
 **Step 2：用 Python one-liner 调 `ao send`**
 
 ```bash
+# 把 kit-NNN 换成真实 session id，把 <task-name> 换成上一步的文件名。
 # Python 负责组 argv，绕过 bash 对单引号的解释；
 # [:500] 负责把发送长度压到稳定范围内，避开已知 F7 stuck input bug。
 python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/root/<task-name>.txt').read().strip()[:500]], check=True)"
@@ -1020,6 +1016,12 @@ python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/roo
 
 这个模板的实际含义是：**先把完整文本安全落盘，再把其前 500 个字符稳定送进 `ao send`**。
 因此最关键的目标、范围、约束要放在文件开头，不要把核心要求埋到后面。
+
+### 为什么这套写法更稳
+
+1. **消息里有单引号时，bash 很容易直接断句。** 只要 brief 里出现 `'`，shell quoting 就可能被打穿，结果不是命令报错，就是发出去的内容已经被截断。Python 这一层直接组 `argv`，不再让 bash 重解释消息正文。
+2. **长消息会撞上上游 `ao send` 的 F7 stuck input bug。** 现象通常是输入卡住、消息发不完整，或者看起来发了但目标 session 实际没有稳定吃到 dispatch。这里把发送内容压到 `[:500]`，先保证稳定送达。
+3. **临时文件路径一旦写错，WSL 侧就会直接找不到。** 这次踩坑里不要用 `/tmp/`；实测稳定路径是 `/root/`，brief 就落在 `/root/<task-name>.txt`，这样最不容易在 WSL 里路径走丢。
 
 ### 什么时候可以废弃这个 workaround
 
