@@ -1,3 +1,4 @@
+---
 name: Dependency Review
 
 on:
@@ -11,11 +12,18 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
+      - name: Skip unsupported repository
+        if: ${{ vars.ENABLE_DEPENDENCY_REVIEW != 'true' }}
+        run: |
+          echo "Dependency review skipped because dependency graph support"
+          echo "is not enabled for this repository."
+
       - name: Checkout
+        if: ${{ vars.ENABLE_DEPENDENCY_REVIEW == 'true' }}
         uses: actions/checkout@v4
 
       - name: Dependency Review
-        continue-on-error: true
+        if: ${{ vars.ENABLE_DEPENDENCY_REVIEW == 'true' }}
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
