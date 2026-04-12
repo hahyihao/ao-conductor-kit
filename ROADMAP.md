@@ -1,6 +1,6 @@
 # AO Conductor Kit — Roadmap
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-13
 > Source of truth for round status and pending work.
 
 ---
@@ -8,11 +8,13 @@
 ## Current Status
 
 ### Round 0 — Bootstrap (DONE)
+
 - experts/ directory structure
 - experts/general/task-splitter.md (hand-written, 284 lines)
 - experts/index.md / audit-log.md / discovery-queue.md / README.md
 
 ### Round 1 — Infrastructure Experts (DONE)
+
 - architect.md (#9)
 - expert-scout.md (#13)
 - library-maintainer.md (#12)
@@ -20,16 +22,20 @@
 - code-reviewer.md (#10)
 
 ### Round 2 — General Experts (DONE)
+
 - code-writer, script-writer, writer, test-engineer, debugger, security-auditor, refactorer, planner
 - All merged to main
 
 ### Round 2.5 — Specialist Experts (DONE)
+
 - expert-writer (#84)
 - prompt-engineer
 - session-learner
 
 ### Round 3 — Project Experts (DONE)
+
 10 project experts merged to main:
+
 - binance-trading, chat-analysis, douyin-content, game-automation
 - novel-reader, qq-bot-audit, swarm-commander, tieba-operation
 - xianyu-ops, ztc-optimizer
@@ -37,22 +43,24 @@
 Total experts in library: 27
 
 ### Round 4 — Self-Growth Mechanism (IN PROGRESS)
+
 - [ ] ADR: docs/adr/0001-self-growth-mechanism.md (architect worker dispatched 2026-04-12)
 - [ ] expert-scout auto-discovery implementation
 - [ ] library-maintainer periodic cleanup implementation
 
 ---
 
-## Community Improvements (IN PROGRESS, dispatched 2026-04-12)
+## Community Improvements (DONE, merged 2026-04-12)
 
-7 tasks dispatched, workers spawning:
-- [ ] CI auto-feedback loop
-- [ ] MAX_ITERATIONS kill switch (task-splitter)
-- [ ] Token budget 85% warning (task-splitter)
-- [ ] auto-reviewer expert
-- [ ] REFLECTION accumulation loop
-- [ ] docs/rolling-handoff-spec.md
-- [ ] ecosystem-monitor expert
+7 tasks merged to main:
+
+- [x] CI auto-feedback loop (#132)
+- [x] MAX_ITERATIONS kill switch (task-splitter) (#133)
+- [x] Token budget 85% warning (task-splitter) (#134)
+- [x] auto-reviewer expert (#135)
+- [x] REFLECTION accumulation loop (#136)
+- [x] docs/rolling-handoff.md specification (#137)
+- [x] ecosystem-monitor expert (#138)
 
 ---
 
@@ -72,13 +80,13 @@ Total experts in library: 27
 
 ## Known Issues
 
-| # | Issue | Status |
-|---|---|---|
-| 1 | tmux 3.2a segfault | Fixed (compiled 3.5a from source) |
-| 2 | WSL PATH Windows pollution | In progress (#62) |
-| 3 | WSL2 localhost forwarding drift | Fixed (repair-wsl2-localhost-forwarding.ps1) |
-| 4 | ao session kill does not clean worktree (Issue 12) | Documented, workaround: manual rm + git worktree prune |
-| 5 | ao status (unknown) != dead | Documented in TROUBLESHOOTING.md |
+| #   | Issue                                              | Status                                                 |
+| --- | -------------------------------------------------- | ------------------------------------------------------ |
+| 1   | tmux 3.2a segfault                                 | Fixed (compiled 3.5a from source)                      |
+| 2   | WSL PATH Windows pollution                         | In progress (#62)                                      |
+| 3   | WSL2 localhost forwarding drift                    | Fixed (repair-wsl2-localhost-forwarding.ps1)           |
+| 4   | ao session kill does not clean worktree (Issue 12) | Documented, workaround: manual rm + Git worktree prune |
+| 5   | ao status (unknown) != dead                        | Documented in TROUBLESHOOTING.md                       |
 
 ---
 
