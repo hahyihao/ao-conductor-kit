@@ -2,13 +2,14 @@
 
 This file is maintained automatically by `library-maintainer`. Do not edit by hand.
 
-Last updated: 2026-04-12 (Issue #138 ecosystem-monitor admission)
+Last updated: 2026-04-12 (ecosystem-monitor + auto-reviewer admissions)
 
 ## General experts
 
 | Name               | Domain  | Base skill                                                                  | Status |
 | ------------------ | ------- | --------------------------------------------------------------------------- | ------ |
 | architect          | general | oh-my-claudecode:architect                                                  | active |
+| auto-reviewer      | general | oh-my-claudecode:code-reviewer + oh-my-claudecode:security-reviewer         | active |
 | code-reviewer      | general | oh-my-claudecode:code-reviewer + oh-my-claudecode:security-reviewer         | active |
 | code-writer        | general | oh-my-claudecode:executor                                                   | active |
 | debugger           | general | oh-my-claudecode:debugger + tracer                                          | active |
@@ -41,7 +42,7 @@ Empty. Auto-populated by expert-scout on demand.
 
 ## Stats
 
-- Total experts: 18
-- Active: 18
+- Total experts: 19
+- Active: 19
 - Archived: 0
 - Awaiting discovery: 0 (see `discovery-queue.md`)
