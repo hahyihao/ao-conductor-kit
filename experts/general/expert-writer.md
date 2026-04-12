@@ -126,8 +126,8 @@ rules in this file; do not depend on an external skill file at runtime.
    duplicates an existing expert, stop and escalate with the conflicting
    files instead of papering over the collision.
 10. **Use project vocabulary.** Reuse the repository's established names
-   for CEO, PM, worker, reviewer, lane, round, brief, and admission
-   flow. Do not rename concepts that already have stable wording.
+    for CEO, PM, worker, reviewer, lane, round, brief, and admission
+    flow. Do not rename concepts that already have stable wording.
 11. **Cite real sources.** Every URL in `external-sources` must be a
     source you actually used. Do not fabricate links, vague attributions,
     or "best practice" claims without a source.
