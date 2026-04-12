@@ -10,18 +10,18 @@ document, this architecture document is the standard to converge toward.
 
 ## Mandatory Sections
 
-| # | Section | What it must contain | Why it exists |
-| --- | --- | --- | --- |
-| 1 | **Frontmatter** | Required fields: `name`, `agent`, `model`, `domain`, `description`, `base-skill`, `status`. Optional: `external-sources`, `project-extensions`, `discovered-on`, `discovered-by`. The `description` must be a rich multi-sentence identity statement that explains what the expert does and when to use it. | Dispatch, discovery, and auditing depend on stable metadata and reliable activation text. |
-| 2 | **When to Apply** | Three tiers only: **Must Use**, **Recommended**, **Skip**. Each tier must include a decision criterion, not just examples. | Workers need a fast routing rule before they read the rest of the file. |
-| 3 | **Rule Categories by Priority** | A table with exactly these columns: `Priority`, `Category`, `Impact`, `Key Checks`, `Antipatterns`. Order rows from highest to lowest priority. | This exposes the expert's decision stack and shows what matters most under pressure. |
-| 4 | **Tools Available** | The tools the expert may use, plus each tool's purpose and usage constraints. Name prohibitions or approval requirements explicitly. | Tool misuse is a common failure mode; the expert must define safe tool boundaries. |
-| 5 | **Core Rules** | A numbered list of the expert's main behavioral rules. These are the primary discipline the worker follows. | This is the executable doctrine of the expert. |
-| 6 | **Antipatterns** | Refused behaviors, bad habits, or common mistakes. Every item must include a `because` clause. | Antipatterns prevent predictable failure and explain the reasoning behind the refusal. |
-| 7 | **Failure Handling** | Concrete failure scenario followed by handling steps or escalation path. | Experts must stay useful when the ideal path breaks. |
-| 8 | **Integration Notes** | Collaboration boundaries, handoffs, and ownership splits with other experts or roles. | Experts operate in a multi-role system and need explicit coordination rules. |
-| 9 | **First Action** | The first thing the expert does at session start, before broad execution begins. | This creates a consistent startup routine and reduces thrashing. |
-| 10 | **Quality Gate** | A self-check checklist. Every item must pass before the expert declares work done. | Completion must be observable and repeatable, not based on intuition. |
+| #   | Section                         | What it must contain                                                                                                                                                                                                                                                                                        | Why it exists                                                                             |
+| --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | **Frontmatter**                 | Required fields: `name`, `agent`, `model`, `domain`, `description`, `base-skill`, `status`. Optional: `external-sources`, `project-extensions`, `discovered-on`, `discovered-by`. The `description` must be a rich multi-sentence identity statement that explains what the expert does and when to use it. | Dispatch, discovery, and auditing depend on stable metadata and reliable activation text. |
+| 2   | **When to Apply**               | Three tiers only: **Must Use**, **Recommended**, **Skip**. Each tier must include a decision criterion, not just examples.                                                                                                                                                                                  | Workers need a fast routing rule before they read the rest of the file.                   |
+| 3   | **Rule Categories by Priority** | A table with exactly these columns: `Priority`, `Category`, `Impact`, `Key Checks`, `Antipatterns`. Order rows from highest to lowest priority.                                                                                                                                                             | This exposes the expert's decision stack and shows what matters most under pressure.      |
+| 4   | **Tools Available**             | The tools the expert may use, plus each tool's purpose and usage constraints. Name prohibitions or approval requirements explicitly.                                                                                                                                                                        | Tool misuse is a common failure mode; the expert must define safe tool boundaries.        |
+| 5   | **Core Rules**                  | A numbered list of the expert's main behavioral rules. These are the primary discipline the worker follows.                                                                                                                                                                                                 | This is the executable doctrine of the expert.                                            |
+| 6   | **Antipatterns**                | Refused behaviors, bad habits, or common mistakes. Every item must include a `because` clause.                                                                                                                                                                                                              | Antipatterns prevent predictable failure and explain the reasoning behind the refusal.    |
+| 7   | **Failure Handling**            | Concrete failure scenario followed by handling steps or escalation path.                                                                                                                                                                                                                                    | Experts must stay useful when the ideal path breaks.                                      |
+| 8   | **Integration Notes**           | Collaboration boundaries, handoffs, and ownership splits with other experts or roles.                                                                                                                                                                                                                       | Experts operate in a multi-role system and need explicit coordination rules.              |
+| 9   | **First Action**                | The first thing the expert does at session start, before broad execution begins.                                                                                                                                                                                                                            | This creates a consistent startup routine and reduces thrashing.                          |
+| 10  | **Quality Gate**                | A self-check checklist. Every item must pass before the expert declares work done.                                                                                                                                                                                                                          | Completion must be observable and repeatable, not based on intuition.                     |
 
 ## Section Guidance
 
@@ -114,15 +114,15 @@ boundary it enforces.
 
 ## 2. Rule Categories by Priority
 
-| Priority | Category | Impact | Key Checks | Antipatterns |
-| --- | --- | --- | --- | --- |
-| P0 | <highest-priority category> | <why it matters> | <what to verify> | <what to avoid> |
-| P1 | <next category> | <why it matters> | <what to verify> | <what to avoid> |
+| Priority | Category                    | Impact           | Key Checks       | Antipatterns    |
+| -------- | --------------------------- | ---------------- | ---------------- | --------------- |
+| P0       | <highest-priority category> | <why it matters> | <what to verify> | <what to avoid> |
+| P1       | <next category>             | <why it matters> | <what to verify> | <what to avoid> |
 
 ## 3. Tools Available
 
-| Tool | Purpose | Usage Constraints |
-| --- | --- | --- |
+| Tool     | Purpose          | Usage Constraints                     |
+| -------- | ---------------- | ------------------------------------- |
 | `<tool>` | <what it is for> | <limits / approval / forbidden cases> |
 
 ## 4. Core Rules
