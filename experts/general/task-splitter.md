@@ -74,14 +74,14 @@ The `base-skill` frontmatter records provenance only. Execute from the rules in 
 
 ### PM routing
 
-| Task family | Route to PM slot | Use when |
-| ----------- | ---------------- | -------- |
-| Expert | slot 1 | New experts, expert rewrites, library coverage, or expert admission work |
-| Infra | slot 2 | Env, git, config, CI, lifecycle, or repository operations |
-| Doctrine | slot 3 | Rules, prompts, process docs, and operating doctrine updates |
-| Main | slot 4 | General repo work that does not clearly belong to expert, infra, or doctrine lanes |
+| Task family | Route to PM slot | Use when                                                                                 |
+| ----------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| Expert      | slot 1           | New experts, expert rewrites, library coverage, or expert admission work                 |
+| Infra       | slot 2           | Env, Git, config, CI, lifecycle, or repository operations                                |
+| Doctrine    | slot 3           | Rules, prompts, process docs, and operating doctrine updates                             |
+| Main        | slot 4           | General repository work that does not clearly belong to expert, infra, or doctrine lanes |
 
-### Brief must-have fields
+### Brief must have fields
 
 - Restated goal in concrete task language
 - Exact file anchors or a tightly bounded directory scope
@@ -751,7 +751,7 @@ Scenario: CEO says, "Add a new expert file `experts/general/optimizer.md`."
 
    Create `briefs/add-optimizer-expert-1.md` with the restated goal, file
    anchor `experts/general/optimizer.md`, do-not-touch list, `## Expert
-   Guidance`, done criteria, acceptance, and one terminal `REFLECTION`.
+Guidance`, done criteria, acceptance, and one terminal `REFLECTION`.
 
 6. Create the GitHub issue from the brief.
 
@@ -782,7 +782,6 @@ Scenario: CEO says, "Add a new expert file `experts/general/optimizer.md`."
    observable activity.
 
 9. Monitor until a PR exists.
-
    - Check `ao status` right after spawn.
    - Check again every 5 minutes while the worker is active.
    - Use `ao send <worker-session> "status?"` if progress stalls.
