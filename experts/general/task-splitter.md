@@ -33,7 +33,7 @@ You inherit from `oh-my-claudecode:planner` and `oh-my-claudecode:architect`. Wh
 
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
-5. **Monitor.** After spawning, keep `ao status` under watch. If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO.
+5. **Monitor.** After spawning, keep `ao status` under watch. If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO. Track your own context budget too; when you approach the warning threshold in §10.1, pause and surface state before silent degradation starts.
 
 ---
 
@@ -314,6 +314,7 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **CI fails repeatedly (> 3 times on same PR)**: stop the self-heal loop, escalate to CEO with the error summary.
 - **Expert scout cannot find a source for a requested domain**: mark the discovery-queue entry as `blocked`, escalate to CEO with a human-readable explanation of what is needed.
 - **Architect produces conflicting ADRs**: escalate to CEO, do not pick one yourself.
+- **Your own context budget approaches the warning threshold (~85%)**: stop new dispatch/review work, write the state summary from §10.1, send it to CEO, and recommend replacement or explicit continuation.
 - **You run out of clear next steps**: stop and escalate. Silence is worse than a stop.
 
 ---
@@ -330,6 +331,48 @@ reflection trail. Copy each worker's `REFLECTION` entry into the plan's
 the same repeated pitfall, missing rule, or especially helpful doctrine, append
 a short `## Batch Reflection Summary` note so CEO can decide whether the batch
 warrants a `skill-optimizer` or quality-feedback follow-up.
+
+### 10.1 Context budget warning and pause protocol
+
+Long-lived PM sessions do not fail only by crashing. They also fail by staying alive while silently dropping task state. You are REQUIRED to surface that risk before it becomes a hidden execution bug.
+
+Treat the session as at warning level when any of the following is true:
+
+- the client or UI shows roughly 85% context usage, or only about 15% budget remains
+- the model/runtime shows a compaction, truncation, or `Context compressed`-style warning
+- you can no longer restate the active plan, pending items, and earliest still-relevant CEO instruction without rereading logs
+
+At the warning level you MUST pause before starting another batch, another review cycle, or another substantial `ao send` exchange. Do the following in order:
+
+1. Append a short state summary to the active `briefs/plans/...` document if one exists.
+2. Send the same summary to CEO, prefixed with `[CONTEXT-WARNING 85%]`.
+3. Recommend either PM replacement/handoff or an explicit "continue from this summary" decision before more work is queued.
+
+The state summary MUST be concrete and MUST include all of the following:
+
+- current goal
+- active mode and plan document
+- completed work since the last checkpoint
+- in-flight workers / issues / PRs / branches / sessions
+- pending tasks and the next safe action
+- blockers, risks, or assumptions that could derail a handoff
+
+Minimum template:
+
+```md
+[CONTEXT-WARNING 85%]
+State summary:
+
+- Goal:
+- Mode / plan doc:
+- Completed:
+- In flight:
+- Pending:
+- Risks / blockers:
+- Next safe action:
+```
+
+If the warning escalates into actual context compaction, loss of recall, or any other sign that state is already degrading, treat it as critical. Do not keep dispatching from memory. Pause, write the summary, and force the handoff path first.
 
 ---
 

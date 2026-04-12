@@ -243,13 +243,14 @@ ao status
 如果某个 session 长时间没有活动、branch 一直没推送、或者 PR 开了但 CI 卡住，你要主动指出风险。
 如果 orchestrator 消失、session 中断、或者 `ao status` 显示异常，先报告故障点，再说明下一步建议。
 
-### 6.1 PM 上下文健康巡检
+### 6.1 PM 上下文健康巡检与暂停协议
 
 除了常规 `ao status` 监控，你还必须主动检查 PM 是否已经接近上下文负载上限。用户提醒不是前提，只要下面任一条件成立，就立刻执行一次上下文健康检查：
 
 1. 距离同一 PM 上次 handoff 或本次启动已经超过 4 小时。
 2. 你在本次会话里已经向同一 PM 发送超过 15 条 `ao send` 消息。
 3. PM 在回报中发出了 `[CONTEXT-LOAD]` 信号，包括 `[CONTEXT-LOAD: N/20]`。
+4. PM 主动回报 `[CONTEXT-WARNING 85%]`，或者你已经看到 compaction、`Context compressed`、明显失忆或状态漂移。
 
 当你向同一 PM 发送到第 10 条 `ao send` 时，必须立刻设置一个 2 小时后的 `ScheduleWakeup`，用于自动触发一次这套上下文健康检查。不要等到用户来催你巡检。
 
@@ -262,7 +263,16 @@ ao status
 ao send <PM> "列出你当前所有 pending 任务和你还记得的最早一条 CEO 指令"
 ```
 
-3. 如果 PM 的回答不完整、漏列 pending 项、或者依赖含糊的历史上下文表述，例如“根据之前讨论”，就把 PM 上下文负载判定为高，并立即进入 PM replacement / handoff 路径。
+1. 如果 PM 的回答不完整、漏列 pending 项、或者依赖含糊的历史上下文表述，例如“根据之前讨论”，就把 PM 上下文负载判定为高，并立即进入 PM replacement / handoff 路径。
+
+如果 PM 已经接近 `85%` 上下文预算，就不要继续往同一 PM 塞新任务。先暂停新增 brief、review 指令或 follow-up，再按顺序做 3 件事：
+
+1. 要求 PM 先给出 state summary；如果 PM 已经给出，就以那份 summary 为准。
+2. 检查 summary 是否至少包含：当前目标、当前 mode / plan 文档、已完成项、在途 worker/issue/PR/branch/session、剩余 pending、风险或阻塞、下一步最安全动作。
+3. 再决定是更换 PM / 做 handoff，还是明确回复“基于这份 summary 继续”。
+
+如果 summary 缺字段、含糊写成“按之前讨论”、或者已经出现明显记忆漂移，就不要继续用同一 PM 硬撑，直接走 handoff / replacement 路径。
+如果你决定继续使用同一 PM，下一条 `ao send` 必须引用这份 summary 作为事实基线，不要写“继续刚才那些”。
 
 ## 7. 审阅协议
 
@@ -335,6 +345,7 @@ gh pr diff <pr-number>
 - Workers 只能看到 issue body，所以每一个相关事实都必须写进 issue body，不要假设 worker 能看到主对话、本地终端历史或你脑中的隐含背景。
 - `agent-orchestrator.yaml` 里的 `runtime` 必须设成 `tmux`，不是 `process`。
 - 从 WSL 调用 `ao start` 或 `ao send` 时，始终要导出或内联 `HTTPS_PROXY`，否则在常见网络环境下可能不稳定或直接失败。
+- 同一个 PM 一旦接近 `85%` 上下文预算，要先 pause + state summary，再决定 handoff 或继续，不要硬塞下一批任务。
 - 用户执行完 `gh auth login` 之后，还要记得运行下面这个命令：
 
 ```bash
