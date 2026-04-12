@@ -3,7 +3,7 @@ port: 3000
 defaults:
   runtime: tmux
   orchestrator:
-    agent: codex
+    agent: claude-code
   worker:
     agent: codex
   workspace: worktree
