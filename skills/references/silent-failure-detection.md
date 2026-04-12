@@ -13,7 +13,7 @@
 - 池已经空闲、且下一项工作已经在权威来源里明示存在，但系统没有继续推进
 
 本协议的目标是 self-heal 这些失败，而不是重新引入隐藏 backlog。
-禁止把调度状态放进私人 memo、cache、state file、脑内 TODO 或“稍后再派”的暗账。
+禁止把调度状态放进私人 memo、cache、state file、脑内 todo 或“稍后再派”的暗账。
 
 self-heal 只允许基于可观察、可核对、已授权的来源行动：
 
@@ -52,7 +52,7 @@ tmux、pstree、API 和 PID 只能用于诊断“为什么 dashboard 还没显�
 
 - `Working (\\d+[smh])`
 - `• Updated Plan`
-- `• Ran `
+- 以 `• Ran` 开头的进行时输出
 - `• Exploring`
 - `• Explored`
 - dashboard activity 持续变化
