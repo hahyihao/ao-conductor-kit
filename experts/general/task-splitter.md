@@ -51,16 +51,16 @@ The `base-skill` frontmatter records provenance only. Execute from the rules in 
 
 ## Rule Categories by Priority
 
-| Priority | Category                                | Impact   | Key Checks                                                       | Antipatterns                                                   |
-| -------- | --------------------------------------- | -------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1        | Brief quality gate (§11.1)              | CRITICAL | All 8 mandatory items present, expert guidance inlined           | Dispatching without restated goal, missing do-not-touch list   |
-| 2        | Splitting principles (§2)               | CRITICAL | Atomicity, independence, testability, self-contained             | Splitting single-file changes, dependent sub-tasks in parallel |
-| 3        | Expert injection (Expert doctrine)      | HIGH     | Correct expert mapping, inline doctrine, missing expert fallback | Naming experts without inlining, ignoring agent field          |
-| 4        | Mode decision (§3)                      | HIGH     | Correct A/B/C classification, proper worker count                | Defaulting to parallel, padding worker count                   |
-| 5        | Pre-dispatch checklist (§5)             | HIGH     | All 13 checks pass, environment verified                         | Spawning without auth check, missing HTTPS_PROXY               |
-| 6        | Monitoring & failure (§8)               | HIGH     | 5-min cadence, stuck detection, escalation thresholds            | Vague monitoring, silent retries, refusing to escalate         |
-| 7        | Recording & reflection (§9)             | MEDIUM   | Plan doc updated, reflections accumulated, batch report sent     | Missing plan doc, stranded reflections                         |
-| 8        | Context self-preservation (§9.2, §10.1) | MEDIUM   | 85% budget warning, 10/15/20 CEO message tracking                | Silent degradation, continuing past critical threshold         |
+| Priority | Category                                | Impact   | Key Checks                                                       | Antipatterns                                                    |
+| -------- | --------------------------------------- | -------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1        | Brief quality gate (§11.1)              | CRITICAL | All 8 mandatory items present, expert guidance inlined           | Dispatching without restated goal, missing do-not-touch list    |
+| 2        | Splitting principles (§2)               | CRITICAL | Atomicity, independence, testability, self-contained             | Splitting single-file changes, dependent sub-tasks in parallel  |
+| 3        | Expert injection (Expert doctrine)      | HIGH     | Correct expert mapping, inline doctrine, missing expert fallback | Naming experts without inlining, ignoring agent field           |
+| 4        | Mode decision (§3)                      | HIGH     | Correct A/B/C classification, proper worker count                | Defaulting to parallel, padding worker count                    |
+| 5        | Pre-dispatch checklist (§5)             | HIGH     | All 14 checks pass, including the Expert Guidance gate           | Spawning without auth check, dispatching without expert context |
+| 6        | Monitoring & failure (§8)               | HIGH     | 5-min cadence, stuck detection, escalation thresholds            | Vague monitoring, silent retries, refusing to escalate          |
+| 7        | Recording & reflection (§9)             | MEDIUM   | Plan doc updated, reflections accumulated, batch report sent     | Missing plan doc, stranded reflections                          |
+| 8        | Context self-preservation (§9.2, §10.1) | MEDIUM   | 85% budget warning, 10/15/20 CEO message tracking                | Silent degradation, continuing past critical threshold          |
 
 ## Tools Available
 
@@ -199,6 +199,16 @@ MUST inline the relevant expert content; naming an expert, linking to
 `experts/general/<name>.md`, or saying "follow architect guidance" is not
 enough.
 
+For a single-expert brief, the section MUST use this shape:
+
+```markdown
+## Expert Guidance — <expert-name> (agent: <agent>, model: <model>)
+
+- <core rule 1 extracted from experts/general/<name>.md>
+- <core rule 2 extracted from experts/general/<name>.md>
+- <core rule 3 extracted from experts/general/<name>.md>
+```
+
 If a task needs multiple experts, inline all of them in the same
 `## Expert Guidance` section, or in a clearly grouped structure inside that
 section such as:
@@ -206,17 +216,19 @@ section such as:
 ```markdown
 ## Expert Guidance
 
-### architect
+### architect (agent: <agent>, model: <model>)
 
-<task-relevant architect guidance>
+- <3-5 task-relevant architect rules>
 
-### writer
+### writer (agent: <agent>, model: <model>)
 
-<task-relevant writer guidance>
+- <3-5 task-relevant writer rules>
 ```
 
 Do not scatter expert doctrine across the brief. Keep it in one obvious
 worker-facing section so the injected rules are inspectable before dispatch.
+For every injected expert, inline 3-5 task-relevant core rules, not a vague
+label and not a pasted full expert file.
 
 ### Missing expert fallback
 
@@ -303,6 +315,21 @@ If a task needs multiple experts, inline every one of them inside the same
 `## Expert Guidance` section, using clearly labeled subsections when helpful.
 Do not leave any expert implied.
 
+For a single-expert brief, the minimum required format is:
+
+```markdown
+## Expert Guidance — <expert-name> (agent: <agent>, model: <model>)
+
+- <3-5 core rules from experts/general/<name>.md relevant to this task>
+```
+
+For a multi-expert brief, keep one top-level `## Expert Guidance` section and
+add one labeled subsection per expert. Each injected expert entry MUST include
+the expert name resolved from `experts/index.md`, the resolved `agent` and
+`model`, and 3-5 core rules extracted from the expert file that are relevant
+to the task at hand. If no matching expert exists, stop and spawn
+`expert-scout` first; do not skip or defer injection.
+
 Every worker brief MUST include a `Done Criteria / Output Verification` section, or an equivalently explicit heading, that requires proof of all three delivery steps:
 
 - `git commit` completed
@@ -372,14 +399,15 @@ Before you call `ao spawn` or `ao batch-spawn`, verify:
 3. `codex --version` succeeds
 4. Current working directory has `agent-orchestrator.yaml`
 5. `ao status` shows the orchestrator session alive
-6. Every required expert is present in `experts/index.md`, every worker brief has inline `## Expert Guidance`, and none of the needed roles are unresolved in `experts/discovery-queue.md`
-7. If the task touched architecture (multi-module, new system), ADR exists under `docs/adr/` and is marked `status: accepted`
-8. `gh auth status` shows logged in
-9. `git status` is clean (or at least doesn't have conflicting uncommitted work)
-10. HTTPS_PROXY env var is set for the spawn command
-11. Each target expert file has been re-read and its resolved `agent` and `model` values are recorded in the plan document
-12. Every `claude-code` worker environment includes `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
-13. Every worker brief passes the §11.1 quality gate, with all 8 mandatory items present and complete
+6. Every required expert is present in `experts/index.md`, and none of the needed roles are unresolved in `experts/discovery-queue.md`
+7. **Expert Guidance injected**: every brief contains a `## Expert Guidance` section with the expert name from the `experts/index.md` lookup, resolved `agent` and `model` fields, and 3-5 core rules extracted from the expert file; if no matching expert exists, `expert-scout` has been spawned first and dispatch remains blocked until that path lands
+8. If the task touched architecture (multi-module, new system), ADR exists under `docs/adr/` and is marked `status: accepted`
+9. `gh auth status` shows logged in
+10. `git status` is clean (or at least doesn't have conflicting uncommitted work)
+11. HTTPS_PROXY env var is set for the spawn command
+12. Each target expert file has been re-read and its resolved `agent` and `model` values are recorded in the plan document
+13. Every `claude-code` worker environment includes `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+14. Every worker brief passes the §11.1 quality gate, with all 8 mandatory items present and complete
 
 If any check fails, stop. Report the specific failure to CEO via `ao send` or stdout. Do not proceed.
 
@@ -391,7 +419,7 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **Ignoring or overriding the architect expert on multi-module tasks.** Refuse it because bypassing the ADR gate turns one ambiguous design problem into several incompatible worker plans. If architect says "rewrite this module first", stop and re-plan.
 - **Writing briefs before the plan doc exists.** Refuse it because plan doc first, briefs second, issues third, and spawn last is the audit trail that keeps CEO and PM aligned.
 - **Inventing facts to fill the brief.** Refuse it because fabricated context contaminates every downstream issue, branch, and PR. If a fact is missing, pause and ask. If you must guess, log the guess explicitly.
-- **Naming experts without inlining their doctrine.** Refuse it because workers do not load expert files by implication. `Inject: writer` is not sufficient; the brief must contain a real `## Expert Guidance` section with the relevant content inlined.
+- **Dispatching a brief without a `## Expert Guidance` section.** Refuse it because the worker has no expert context and will produce generic output that misses domain-specific rules. A bare expert name, file path, or `Inject: writer` line does not count; the brief must inline the resolved expert name, agent/model, and task-relevant rules.
 - **Ignoring the target expert's `agent` field.** Refuse it because the wrong runtime can violate the expert's execution assumptions before work even starts.
 - **Spawning before scout has admitted the missing expert.** Refuse it because incomplete expert coverage produces low-quality briefs and misrouted workers.
 - **Reporting progress as "all spawned" without recording session names.** Refuse it because you cannot monitor, redirect, or replace workers you failed to name.
@@ -534,7 +562,7 @@ Every worker brief MUST restate the goal in concrete task language and MUST decl
 - a restated goal
 - file anchors that name the exact files, directories, or bounded scope the worker may change
 - a do-not-touch list that names forbidden files, directories, and out-of-scope surfaces
-- an `## Expert Guidance` section that inlines the task-relevant doctrine for every injected expert
+- an `## Expert Guidance` section that inlines the task-relevant doctrine for every injected expert, including resolved expert name, agent/model, and 3-5 core rules
 - an output contract that states the required delivery format
 - a `REFLECTION` requirement that asks for exactly one terminal reflection entry
 - a done-criteria / output-verification section that defines the handoff completion gate
@@ -620,7 +648,7 @@ Before dispatching any worker, verify these PM-layer gates pass:
 - [ ] Goal restated in concrete task language
 - [ ] File anchors name exact files/directories the worker may change
 - [ ] Do-not-touch list names forbidden surfaces
-- [ ] `## Expert Guidance` section inlines relevant expert doctrine
+- [ ] `## Expert Guidance` section inlines resolved expert name, agent/model, and 3-5 relevant core rules
 - [ ] Output contract states required delivery format
 - [ ] REFLECTION requirement asks for exactly one terminal entry
 - [ ] Done-criteria section defines handoff completion gate
