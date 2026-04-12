@@ -7,7 +7,13 @@ defaults:
   worker:
     agent: codex
   workspace: worktree
-  notifiers: []
+  notifiers:
+    - webhook
+
+notifiers:
+  webhook:
+    plugin: webhook
+    url: http://127.0.0.1:8765
 
 projects:
   ao-kit:
@@ -44,3 +50,115 @@ projects:
     path: /root/lanes/kit-slot-4
     defaultBranch: lanes/slot-4
     sessionPrefix: kit4
+
+  ao-kit-slot-5:
+    name: AO Kit Slot 5
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-5
+    defaultBranch: lanes/slot-5
+    sessionPrefix: kit5
+
+  ao-kit-slot-6:
+    name: AO Kit Slot 6
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-6
+    defaultBranch: lanes/slot-6
+    sessionPrefix: kit6
+
+  ao-kit-slot-7:
+    name: AO Kit Slot 7
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-7
+    defaultBranch: lanes/slot-7
+    sessionPrefix: kit7
+
+  ao-kit-slot-8:
+    name: AO Kit Slot 8
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-8
+    defaultBranch: lanes/slot-8
+    sessionPrefix: kit8
+
+  ao-kit-slot-9:
+    name: AO Kit Slot 9
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-9
+    defaultBranch: lanes/slot-9
+    sessionPrefix: kit9
+
+  ao-kit-slot-10:
+    name: AO Kit Slot 10
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-10
+    defaultBranch: lanes/slot-10
+    sessionPrefix: kit10
+
+  ao-kit-slot-11:
+    name: AO Kit Slot 11
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-11
+    defaultBranch: lanes/slot-11
+    sessionPrefix: kit11
+
+  ao-kit-slot-12:
+    name: AO Kit Slot 12
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-12
+    defaultBranch: lanes/slot-12
+    sessionPrefix: kit12
+
+  ao-kit-slot-13:
+    name: AO Kit Slot 13
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-13
+    defaultBranch: lanes/slot-13
+    sessionPrefix: kit13
+
+  ao-kit-slot-14:
+    name: AO Kit Slot 14
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-14
+    defaultBranch: lanes/slot-14
+    sessionPrefix: kit14
+
+  ao-kit-slot-15:
+    name: AO Kit Slot 15
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-15
+    defaultBranch: lanes/slot-15
+    sessionPrefix: kit15
+
+  ao-kit-slot-16:
+    name: AO Kit Slot 16
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-16
+    defaultBranch: lanes/slot-16
+    sessionPrefix: kit16
+
+  ao-kit-slot-17:
+    name: AO Kit Slot 17
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-17
+    defaultBranch: lanes/slot-17
+    sessionPrefix: kit17
+
+  ao-kit-slot-18:
+    name: AO Kit Slot 18
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-18
+    defaultBranch: lanes/slot-18
+    sessionPrefix: kit18
+
+  ao-kit-slot-19:
+    name: AO Kit Slot 19
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-19
+    defaultBranch: lanes/slot-19
+    sessionPrefix: kit19
+
+  ao-kit-slot-20:
+    name: AO Kit Slot 20
+    repo: hahyihao/ao-conductor-kit
+    path: /root/lanes/kit-slot-20
+    defaultBranch: lanes/slot-20
+    sessionPrefix: kit20
