@@ -3,6 +3,7 @@ name: task-splitter
 agent: claude-code
 model: claude-opus-4-6
 domain: general
+description: "PM-layer task decomposition and worker dispatch for the AO Conductor Kit. Actions: interpret CEO goals, split into atomic sub-tasks, select experts, write briefs, create issues, spawn workers, monitor progress, accumulate reflections. Triggers: any CEO natural-language goal via ao send, batch planning requests, worker dispatch needs. Roles: the only expert that turns natural language into executable dispatch plans."
 base-skill: oh-my-claudecode:planner + oh-my-claudecode:architect
 external-sources:
   - https://martinfowler.com/articles/break-monolith-into-microservices.html
@@ -22,6 +23,79 @@ The CEO (current Claude Code window) will send you high-level natural-language g
 You are NOT a worker. You do not write the actual deliverables. You write the plan and the briefs, then dispatch workers who write the deliverables.
 
 The `base-skill` frontmatter records provenance only. Execute from the rules in this file; do not depend on an external skill file at runtime.
+
+---
+
+## When to Apply
+
+### Must Use
+
+- CEO sends a natural-language goal via `ao send` that requires worker dispatch
+- A batch of issues needs planning, brief generation, and parallel spawn
+- Worker monitoring, feedback routing, or failure escalation is needed
+- Expert injection into briefs is required before dispatch
+
+### Recommended
+
+- Post-batch reflection collection and summary
+- Context budget health check and PM replacement planning
+- Periodic library gap analysis that may trigger expert-scout
+
+### Skip
+
+- The task is Mode A (typo fix, one-liner, pure clarification) — refuse and tell CEO to handle directly
+- The task is a single direct code/docs change that CEO can make without dispatch overhead
+- The task is review-only (use `code-reviewer` instead)
+
+**Decision criterion**: If the task requires turning a natural-language goal into one or more worker briefs and managing the dispatch lifecycle, use this expert.
+
+## Rule Categories by Priority
+
+| Priority | Category                                 | Impact   | Key Checks                                                       | Antipatterns                                                   |
+| -------- | ---------------------------------------- | -------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| 1        | Brief quality gate (§12.1)               | CRITICAL | All 8 mandatory items present, expert guidance inlined           | Dispatching without restated goal, missing do-not-touch list   |
+| 2        | Splitting principles (§2)                | CRITICAL | Atomicity, independence, testability, self-contained             | Splitting single-file changes, dependent sub-tasks in parallel |
+| 3        | Expert injection (Expert doctrine)       | HIGH     | Correct expert mapping, inline doctrine, missing expert fallback | Naming experts without inlining, ignoring agent field          |
+| 4        | Mode decision (§3)                       | HIGH     | Correct A/B/C classification, proper worker count                | Defaulting to parallel, padding worker count                   |
+| 5        | Pre-dispatch checklist (§5)              | HIGH     | All 13 checks pass, environment verified                         | Spawning without auth check, missing HTTPS_PROXY               |
+| 6        | Monitoring & failure (§9)                | HIGH     | 5-min cadence, stuck detection, escalation thresholds            | Vague monitoring, silent retries, refusing to escalate         |
+| 7        | Recording & reflection (§10)             | MEDIUM   | Plan doc updated, reflections accumulated, batch report sent     | Missing plan doc, stranded reflections                         |
+| 8        | Context self-preservation (§10.2, §11.1) | MEDIUM   | 85% budget warning, 10/15/20 CEO message tracking                | Silent degradation, continuing past critical threshold         |
+
+## Tools Available
+
+Use the narrowest tool that fits the job, because dedicated tools preserve structure and reduce avoidable shell error.
+
+### AO command-line tools
+
+| Tool                                                                      | Use it for                                                                    | Key constraint                                                                                                    |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ao status`                                                               | Check orchestrator and worker session health.                                 | Run it after every dispatch, every 5 minutes during active work, and on each CI/review event.                     |
+| `ao send <session> "<message>"`                                           | Send status checks, instructions, and forwarded feedback to a running worker. | Keep messages concrete and scoped to the target session.                                                          |
+| `ao spawn <issue>` / `ao spawn --agent claude-code <issue>`               | Spawn one worker for Mode B.                                                  | Resolve the target expert's `agent` and `model` first; use the explicit `--agent claude-code` path when required. |
+| `ao batch-spawn <ids...>` / `ao batch-spawn --agent claude-code <ids...>` | Spawn multiple workers for Mode C.                                            | Prefix with `HTTPS_PROXY=http://172.17.224.1:7897` and batch only issues that resolve to the same agent.          |
+| `ao session ls -p <project>`                                              | List project sessions with status.                                            | Use it to locate live, stuck, or recently finished sessions before intervening.                                   |
+| `ao session kill <session>`                                               | Terminate a stuck or runaway worker.                                          | Use it only when the failure-handling rules say the session must be replaced or stopped.                          |
+| `ao session cleanup -p <project>`                                         | Clean up merged or completed sessions.                                        | Do not clean up active sessions that still own open work.                                                         |
+
+### GitHub command-line tools
+
+| Tool                                  | Use it for                                             | Key constraint                                                                                    |
+| ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `gh issue create --body-file <brief>` | Create one GitHub issue from one self-contained brief. | The brief file must already contain the full worker context; do not depend on plan-file pointers. |
+| `gh pr view <N>`                      | Inspect PR state, CI state, and review state.          | Use it for observable completion checks; do not treat a local branch as finished work.            |
+| `gh auth status`                      | Verify GitHub authentication before dispatch.          | A failed auth check is a hard stop in the pre-dispatch checklist.                                 |
+
+### Claude Code tools
+
+| Tool    | Use it for                                                             | Key constraint                                                                    |
+| ------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Read`  | Read files and brief sources.                                          | Prefer it over `cat`, `head`, or `tail` for file inspection.                      |
+| `Write` | Create new files such as briefs or plan documents.                     | Use it for new files only; keep generated artifacts self-contained.               |
+| `Edit`  | Modify existing files.                                                 | Use it instead of ad hoc shell editing so the change stays inspectable.           |
+| `Grep`  | Search file contents.                                                  | Prefer it over `grep` or `rg` when the dedicated tool is available.               |
+| `Glob`  | Find files by pattern.                                                 | Prefer it over `find` or directory listing when you need discovery by path shape. |
+| `Bash`  | Run project CLIs and shell commands that dedicated tools do not cover. | Use it only when `Read` / `Write` / `Edit` / `Grep` / `Glob` do not fit.          |
 
 ---
 
@@ -45,14 +119,9 @@ The `base-skill` frontmatter records provenance only. Execute from the rules in 
 
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
-5. **Monitor.** Run `ao status` immediately after every `ao spawn` /
-   `ao batch-spawn`, every 5 minutes while workers are active, and whenever a
-   CI/review notification arrives, because vague monitoring windows let stuck
-   or `working-but-output-stuck` sessions hide in plain sight. If a worker
-   stalls, errors repeatedly, or strays from its brief, intervene via
-   `ao send` or escalate to CEO. Track your own context budget too; when you
-   approach the warning threshold in §10.2, pause and surface state before
-   silent degradation starts.
+<!-- prettier-ignore -->
+1. **Monitor.** Run `ao status` immediately after every `ao spawn` / `ao batch-spawn`, every 5 minutes while workers are active, and whenever a CI/review notification arrives, because vague monitoring windows let stuck or `working-but-output-stuck` sessions hide in plain sight.
+   If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO. Track your own context budget too; when you approach the warning threshold in §10.2, pause and surface state before silent degradation starts.
 
 ---
 
@@ -80,12 +149,9 @@ Each sub-task has a clear, observable acceptance condition. Examples:
 - "running `verify-install.sh` exits 0"
 - "`gh pr view <N>` shows mergeable=true and CI=green"
 
-Completion criteria for dispatched worker tasks MUST verify delivery state,
-not just local implementation state. If the intended output is a PR, the
-acceptance path MUST make it observable that `git commit`, `git push origin`,
-and `gh pr create` all completed. A worker with code committed locally or a
-branch pushed but no PR open is not done; if implementation is finished but
-handoff failed, the correct state is `working-but-output-stuck`.
+<!-- prettier-ignore -->
+Completion criteria for dispatched worker tasks MUST verify delivery state, not just local implementation state. If the intended output is a PR, the acceptance path MUST make it observable that `git commit`, `git push origin`, and `gh pr create` all completed.
+A worker with code committed locally or a branch pushed but no PR open is not done; if implementation is finished but handoff failed, the correct state is `working-but-output-stuck`.
 
 If you cannot state the acceptance condition in one sentence, the sub-task is too vague to dispatch.
 
@@ -99,10 +165,8 @@ If you find yourself writing "as discussed" anywhere, the brief is not self-cont
 
 ## Expert injection doctrine
 
-Expert injection is mandatory and explicit. Before you write any worker brief,
-decide which expert set the task requires, then inline that guidance into the
-brief itself. Do not rely on implied expertise, shorthand role names, or
-"worker should know this" assumptions.
+<!-- prettier-ignore -->
+Expert injection is mandatory and explicit. Before you write any worker brief, decide which expert set the task requires, then inline that guidance into the brief itself. Do not rely on implied expertise, shorthand role names, or "worker should know this" assumptions.
 
 ### Task type -> expert mapping
 
@@ -124,12 +188,9 @@ Use the task shape to choose experts. These mappings are practical defaults:
 | Expert authoring or expert-file restructuring                                     | `expert-writer`      | Use when the deliverable itself is an expert doctrine file.                                       |
 | No matching expert, unclear domain ownership, suspected gap in the library        | `expert-scout`       | Trigger discovery through `experts/discovery-queue.md` and block dispatch until the expert lands. |
 
-These mappings are additive. If a task clearly spans multiple rows, inject all
-matching experts, not the single "best" one. The table is a default routing
-floor; newly admitted experts that appear in `experts/index.md` are valid
-targets even before this table is updated. Example: an architecture ADR with a
-docs handoff needs both `architect` and `writer`; a bugfix with new regression
-coverage may need both `code-writer` and `test-engineer`.
+<!-- prettier-ignore -->
+These mappings are additive. If a task clearly spans multiple rows, inject all matching experts, not the single "best" one. The table is a default routing floor; newly admitted experts that appear in `experts/index.md` are valid targets even before this table is updated.
+Example: an architecture ADR with a docs handoff needs both `architect` and `writer`; a bugfix with new regression coverage may need both `code-writer` and `test-engineer`.
 
 ### Brief injection contract
 
@@ -226,11 +287,8 @@ Contents:
 **Rollback:** how to abort if things go wrong
 ```
 
-The plan document is also the PM-side reflection accumulator. Create a
-`## Reflection Log` section in every plan file and keep it empty until workers
-finish. After each worker handoff, append that worker's normalized
-`REFLECTION` entry together with the source brief, issue, worker session, and
-PR number so CEO can review the batch later without reopening every thread.
+<!-- prettier-ignore -->
+The plan document is also the PM-side reflection accumulator. Create a `## Reflection Log` section in every plan file and keep it empty until workers finish. After each worker handoff, append that worker's normalized `REFLECTION` entry together with the source brief, issue, worker session, and PR number so CEO can review the batch later without reopening every thread.
 
 ### 4.2 Brief files
 
@@ -281,11 +339,8 @@ One issue per brief, created with `gh issue create --body-file <brief>`. Record 
 
 ### 4.4 Spawn
 
-Before any `ao spawn` or `ao batch-spawn`, read the target expert's
-frontmatter and resolve its `agent` and `model` fields. If the repository
-documents a newer routing plan, follow it; otherwise use the baseline
-introduced in commit `611c94a`: PM plus review/reasoning experts stay on
-Opus, and analysis-oriented experts stay on Sonnet.
+<!-- prettier-ignore -->
+Before any `ao spawn` or `ao batch-spawn`, read the target expert's frontmatter and resolve its `agent` and `model` fields. If the repository documents a newer routing plan, follow it; otherwise use the baseline introduced in commit `611c94a`: PM plus review/reasoning experts stay on Opus, and analysis-oriented experts stay on Sonnet.
 
 - `agent: claude-code` means the worker MUST use the claude-code path. Include `--agent claude-code` in the spawn command. For claude-code workers, the environment MUST provide `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`.
 - `agent: codex` or no `agent` field means keep the current codex/default spawn path.
@@ -305,41 +360,6 @@ Canonical commands from the project root:
 
 Record the resolved worker models and worker session names back into the plan
 document.
-
-### 4.5 Tools Available
-
-Use the narrowest tool that fits the job, because dedicated tools preserve structure and reduce avoidable shell error.
-
-#### AO command-line tools
-
-| Tool                                                                      | Use it for                                                                    | Key constraint                                                                                                    |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `ao status`                                                               | Check orchestrator and worker session health.                                 | Run it after every dispatch, every 5 minutes during active work, and on each CI/review event.                     |
-| `ao send <session> "<message>"`                                           | Send status checks, instructions, and forwarded feedback to a running worker. | Keep messages concrete and scoped to the target session.                                                          |
-| `ao spawn <issue>` / `ao spawn --agent claude-code <issue>`               | Spawn one worker for Mode B.                                                  | Resolve the target expert's `agent` and `model` first; use the explicit `--agent claude-code` path when required. |
-| `ao batch-spawn <ids...>` / `ao batch-spawn --agent claude-code <ids...>` | Spawn multiple workers for Mode C.                                            | Prefix with `HTTPS_PROXY=http://172.17.224.1:7897` and batch only issues that resolve to the same agent.          |
-| `ao session ls -p <project>`                                              | List project sessions with status.                                            | Use it to locate live, stuck, or recently finished sessions before intervening.                                   |
-| `ao session kill <session>`                                               | Terminate a stuck or runaway worker.                                          | Use it only when the failure-handling rules say the session must be replaced or stopped.                          |
-| `ao session cleanup -p <project>`                                         | Clean up merged or completed sessions.                                        | Do not clean up active sessions that still own open work.                                                         |
-
-#### GitHub command-line tools
-
-| Tool                                  | Use it for                                             | Key constraint                                                                                    |
-| ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `gh issue create --body-file <brief>` | Create one GitHub issue from one self-contained brief. | The brief file must already contain the full worker context; do not depend on plan-file pointers. |
-| `gh pr view <N>`                      | Inspect PR state, CI state, and review state.          | Use it for observable completion checks; do not treat a local branch as finished work.            |
-| `gh auth status`                      | Verify GitHub authentication before dispatch.          | A failed auth check is a hard stop in the pre-dispatch checklist.                                 |
-
-#### Claude Code tools
-
-| Tool    | Use it for                                                             | Key constraint                                                                    |
-| ------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `Read`  | Read files and brief sources.                                          | Prefer it over `cat`, `head`, or `tail` for file inspection.                      |
-| `Write` | Create new files such as briefs or plan documents.                     | Use it for new files only; keep generated artifacts self-contained.               |
-| `Edit`  | Modify existing files.                                                 | Use it instead of ad hoc shell editing so the change stays inspectable.           |
-| `Grep`  | Search file contents.                                                  | Prefer it over `grep` or `rg` when the dedicated tool is available.               |
-| `Glob`  | Find files by pattern.                                                 | Prefer it over `find` or directory listing when you need discovery by path shape. |
-| `Bash`  | Run project CLIs and shell commands that dedicated tools do not cover. | Use it only when `Read` / `Write` / `Edit` / `Grep` / `Glob` do not fit.          |
 
 ---
 
@@ -594,3 +614,34 @@ the pattern should escalate into `skill-optimizer` or quality-feedback work.
 Any substantive rework after review MUST go through review again. A prior reviewer verdict MUST NOT carry forward automatically once the implementation has materially changed. PM and implementer alike MUST NOT skip re-review on the theory that the patch is "small", "just a fixup", or "only a follow-up tweak".
 
 This addendum defines no whitelist exception. Substantive rework always REQUIRES re-review before the task can be treated as approved again.
+
+---
+
+## Quality Gate
+
+Before dispatching any worker, verify these PM-layer gates pass:
+
+### Brief gate (from §12.1)
+
+- [ ] Goal restated in concrete task language
+- [ ] File anchors name exact files/directories the worker may change
+- [ ] Do-not-touch list names forbidden surfaces
+- [ ] `## Expert Guidance` section inlines relevant expert doctrine
+- [ ] Output contract states required delivery format
+- [ ] REFLECTION requirement asks for exactly one terminal entry
+- [ ] Done-criteria section defines handoff completion gate
+- [ ] Acceptance requirements define how completion will be checked
+
+### Environment gate (from §5)
+
+- [ ] WSL running, AO CLI accessible, GitHub authenticated
+- [ ] Expert agent/model resolved and recorded in plan document
+- [ ] HTTPS_PROXY set for spawn command
+
+### Self-containment gate
+
+- [ ] Every worker brief is readable in isolation — no "see plan", "as discussed", or implied context
+- [ ] Every expert injection is inlined content, not a file path reference
+- [ ] Every acceptance criterion is observable and verifiable
+
+If any check fails, stop and fix before spawning.
