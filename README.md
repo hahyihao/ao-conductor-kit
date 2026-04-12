@@ -48,10 +48,19 @@ cd D:\脚本程序\agent-orchestrator
 # 5. 安装 AO 工具链
 wsl -d Ubuntu-22.04 bash /mnt/d/脚本程序/agent-orchestrator/scripts/bootstrap-ao.sh
 
-# 6. 按 INSTALL.md 的 Phase 4-8 配 codex / 代理 / gh auth
+# 6. 立刻验证安装结果（尤其是 tmux）
+wsl -d Ubuntu-22.04 bash /mnt/d/脚本程序/agent-orchestrator/scripts/verify-install.sh
+
+# 7. 按 INSTALL.md 的 Phase 4-8 配 codex / 代理 / gh auth
 ```
 
 详细步骤见 **[INSTALL.md](INSTALL.md)**。
+
+> **重要警告（Ubuntu 22.04 tmux）**
+>
+> Ubuntu 22.04 apt 自带的 `tmux 3.2a` 有一个 **NULL pointer segfault bug**，对 AO / Codex 的 detached session **不安全**。在 `tmux + codex TUI + 文件操作` 负载下，它会触发崩溃，导致 orchestrator / worker session 无故被杀掉。根因和复现证据见 [TROUBLESHOOTING.md Issue 11](TROUBLESHOOTING.md#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)。
+>
+> `scripts/bootstrap-ao.sh` 现在会在检测到 `tmux < 3.3` 时自动从源码编译并安装 `tmux 3.5a`，然后把 `/usr/bin/tmux` 指向 `/usr/local/bin/tmux`。跑完安装后，务必执行 `scripts/verify-install.sh`，确认 `tmux -V` 是 `3.3+` 再继续使用 AO。
 
 ### 场景 B：为现有项目启用 AO
 
@@ -136,14 +145,14 @@ agent-orchestrator/
 
 ## 核心文档索引
 
-| 你想做什么 | 看哪个文档 |
-|---|---|
-| 从零装一遍 | [INSTALL.md](INSTALL.md) |
-| 理解 Claude/Codex 分工逻辑 | [FLOW.md](FLOW.md) |
-| 遇到报错 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
-| 让 Claude 自动变总经理 | [skills/ao-conductor.md](skills/ao-conductor.md) |
-| 写新任务的 brief | [briefs/](briefs/) 目录里任选一份参考 |
-| 新项目 AO 配置 | [templates/agent-orchestrator.yaml](templates/agent-orchestrator.yaml) |
+| 你想做什么                 | 看哪个文档                                                             |
+| -------------------------- | ---------------------------------------------------------------------- |
+| 从零装一遍                 | [INSTALL.md](INSTALL.md)                                               |
+| 理解 Claude/Codex 分工逻辑 | [FLOW.md](FLOW.md)                                                     |
+| 遇到报错                   | [TROUBLESHOOTING.md](TROUBLESHOOTING.md)                               |
+| 让 Claude 自动变总经理     | [skills/ao-conductor.md](skills/ao-conductor.md)                       |
+| 写新任务的 brief           | [briefs/](briefs/) 目录里任选一份参考                                  |
+| 新项目 AO 配置             | [templates/agent-orchestrator.yaml](templates/agent-orchestrator.yaml) |
 
 ---
 
@@ -156,9 +165,9 @@ agent-orchestrator/
 1. 用户提出"把今天的流程整理成可移植 init kit"
 2. 作为 CEO 的 Claude 把需求拆成 6 个独立子任务
 3. 为每个子任务写 brief（存于 `briefs/`）
-4. 创建 6 个 GitHub issue（`#9`-`#14`，在 repo `hahyihao/ao-test`）
+4. 创建 6 个 GitHub issue（`#9`-`#14`，在 repository `hahyihao/ao-test`）
 5. `ao batch-spawn 9 10 11 12 13 14` 派 6 路并行 worker
-6. 每个 worker 在独立 git worktree 里用 Codex (gpt-5.4) 写文件
+6. 每个 worker 在独立 Git worktree 里用 Codex (gpt-5.4) 写文件
 7. 每个 worker commit + push + 自动开 PR
 8. CEO 把 6 个 PR 的文件提取到母盘（`ci-staging/build-mother.sh`）
 9. CEO 补上 `README.md`（本文件）和 `templates/`
