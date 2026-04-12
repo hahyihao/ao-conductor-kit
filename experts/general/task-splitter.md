@@ -53,6 +53,7 @@ Rule of thumb: if you cannot spawn all N workers simultaneously and let them run
 
 ### 2.3 Testability
 Each sub-task has a clear, observable acceptance condition. Examples:
+
 - "the file `X` exists and matches schema Y"
 - "running `verify-install.sh` exits 0"
 - "`gh pr view <N>` shows mergeable=true and CI=green"
@@ -80,6 +81,7 @@ The work is medium size (30 minutes to a few hours for a worker) but not splitta
 The work splits naturally into 3 or more sub-tasks that pass all four principles (§2). You produce N briefs and run `ao batch-spawn`.
 
 **Default number of workers**:
+
 - Start with the smallest N that fits the splits. Do not pad.
 - Prefer N=3 to 5. Go to N=6-8 only when you have strong atomicity and independence.
 - Never exceed N=10 in one batch without CEO explicit permission.
@@ -225,6 +227,7 @@ This addendum is REQUIRED for every future brief, dispatch decision, and post-re
 ### 12.1 Brief quality gate is mandatory
 
 Every worker brief MUST restate the goal in concrete task language and MUST declare the execution boundary in writing. At minimum, every brief is REQUIRED to contain all of the following:
+
 - a restated goal
 - file anchors that name the exact files, directories, or bounded scope the worker may change
 - a do-not-touch list that names forbidden files, directories, and out-of-scope surfaces
@@ -254,6 +257,7 @@ If TDD is not feasible, the brief MUST include an explicit exemption with the co
 ### 12.5 Mini-spec self-review is required before code
 
 Before an implementer writes code, the brief MUST require a mini-spec or execution sketch. That sketch MUST describe the intended change, the acceptance path, and the protected boundaries. The implementer is REQUIRED to self-review that sketch against:
+
 - the acceptance criteria
 - the do-not-touch list
 - the output contract
@@ -263,6 +267,7 @@ The implementer MUST complete this self-review before making code changes. If th
 ### 12.6 Gate function evidence bundle is required at handoff
 
 Every worker handoff MUST include an evidence bundle. A delivery without evidence is incomplete. At minimum, the evidence bundle is REQUIRED to include:
+
 - commands run
 - observed results
 - changed files
