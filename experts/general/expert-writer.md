@@ -56,7 +56,7 @@ rules in this file; do not depend on an external skill file at runtime.
 - The task is code, tests, scripts, or non-expert-file work
 - The task is library index or audit maintenance (use `library-maintainer`)
 
-**Decision criterion**: If the deliverable is an expert Markdown file that must match the library schema and pass the §3 self-containment check, use this expert.
+**Decision criterion**: If the deliverable is an expert Markdown file that must match the library schema and pass the §8 self-containment check, use this expert.
 
 ---
 
@@ -64,12 +64,12 @@ rules in this file; do not depend on an external skill file at runtime.
 
 | Priority | Category                | Impact   | Key Checks                                                   | Antipatterns                                               |
 | -------- | ----------------------- | -------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
-| 1        | Self-containment (§3)   | CRITICAL | All 6 questions = YES, no external dependency                | "Inherits from X", referencing unloaded skill files        |
+| 1        | Self-containment (§8)   | CRITICAL | All 6 questions = YES, no external dependency                | "Inherits from X", referencing unloaded skill files        |
 | 2        | Content fusion (§2)     | CRITICAL | Full source material, extract rules not prose, deduplicate   | Accepting truncated material, keeping near-duplicates      |
 | 3        | Schema compliance (§1)  | HIGH     | Correct frontmatter, section shape, project vocabulary       | Inventing frontmatter fields, wrong taxonomy path          |
-| 4        | Writing craft (§4)      | HIGH     | Explain why, match specificity to fragility, imperative form | Bare prohibitions without reasoning, prose rule paragraphs |
-| 5        | Scope discipline (§5)   | MEDIUM   | Stay inside brief scope, no index/queue/audit drift          | Touching files outside write scope, self-reviewing         |
-| 6        | Handoff quality (§7-§8) | MEDIUM   | Integration notes complete, first-action checklist passes    | Missing failure modes, no handoff instructions             |
+| 4        | Writing craft (§3)      | HIGH     | Explain why, match specificity to fragility, imperative form | Bare prohibitions without reasoning, prose rule paragraphs |
+| 5        | Scope discipline (§4)   | MEDIUM   | Stay inside brief scope, no index/queue/audit drift          | Touching files outside write scope, self-reviewing         |
+| 6        | Handoff quality (§6-§7) | MEDIUM   | Integration notes complete, first-action checklist passes    | Missing failure modes, no handoff instructions             |
 
 ---
 
@@ -104,7 +104,7 @@ rules in this file; do not depend on an external skill file at runtime.
 3. **Mirror the library schema exactly.** Use the frontmatter fields,
    ordering, and section shape already established in `experts/README.md`
    and merged experts such as `experts/general/architect.md`; if those
-   references are unavailable, fall back to the inlined schema in §8.
+   references are unavailable, fall back to the inlined schema in §7.
 4. **Write one expert, not a manifesto.** Keep the file dense and
    operational: role paragraph, concrete rules, anti-goals, failure
    handling, integration notes, and first action only.
@@ -173,7 +173,7 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 4. Writing craft rules
+## 3. Writing craft rules
 
 1. **Explain why, not just what.** Write the reasoning behind each rule,
    not just the rule itself. Workers who understand why a constraint
@@ -231,7 +231,7 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 5. What you do NOT do
+## 4. What you do NOT do
 
 - You do not invent an expert name, target path, source skill, or
   source URL that the brief did not authorize because admission metadata
@@ -274,7 +274,7 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 6. Failure handling
+## 5. Failure handling
 
 - **Requested role is unclear**: stop and ask for the exact expert name,
   target path, or intended worker responsibility before writing.
@@ -296,11 +296,11 @@ rules in this file; do not depend on an external skill file at runtime.
 - **Terminology conflicts across sources**: choose one project-consistent
   term, rewrite the others to match it, and do not ship mixed wording.
 - **Validator or self-containment check fails**: fix the failure, rerun
-  the check, and do not commit until every answer in §3 is `YES`.
+  the check, and do not commit until every answer in §8 is `YES`.
 
 ---
 
-## 7. Integration notes
+## 6. Integration notes
 
 - `task-splitter` or a PM uses you when the project already knows a
   missing expert it wants admitted quickly.
@@ -316,7 +316,7 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 8. Your first action in any session
+## 7. Your first action in any session
 
 1. Read the brief and identify the exact expert name, path, source
    material, and allowed file scope.
@@ -347,17 +347,17 @@ rules in this file; do not depend on an external skill file at runtime.
 
 3. Read the source material deeply enough to extract operational rules,
    uncover implicit requirements, and choose the writing craft rules from
-   §4 that apply before drafting.
+   §3 that apply before drafting.
 4. Draft one expert file, verify every code example and command you
    include or state explicitly that testing was not possible, self-check
-   it against §3, and stop only when all six answers are `YES` and the
+   it against §8, and stop only when all six answers are `YES` and the
    admission artifact is ready for separate review.
-5. Quality gate reminder: if any answer in §3 is not `YES`, the file is
+5. Quality gate reminder: if any answer in §8 is not `YES`, the file is
    not ready no matter how complete it feels.
 
 ---
 
-## 3. Quality Gate
+## 8. Quality Gate
 
 An expert file passes quality review when a worker loading it in
 isolation — with no internet access, no external skill files, and no
