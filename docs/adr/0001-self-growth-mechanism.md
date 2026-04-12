@@ -16,7 +16,7 @@ is to make that library self-growing at runtime:
 - when the library drifts, overlaps, or accumulates stale records, the
   system should clean it up without deleting history
 
-Today that behavior exists only as doctrine. The repo has:
+Today that behavior exists only as doctrine. The repository has:
 
 - a documented `expert-scout` role
 - a documented `library-maintainer` role
@@ -44,7 +44,7 @@ issue splitting. It does not introduce runtime code in this PR.
 
 ## Decision Drivers
 
-1. Self-growth must preserve the repo's core audit model: issue -> branch
+1. Self-growth must preserve the repository's core audit model: issue -> branch
    -> PR -> merge.
 2. Dispatch quality must remain deterministic. A worker must not silently
    improvise because an expert was missing.
@@ -126,7 +126,7 @@ Architecturally, a discovery request has three states:
 - `resolved`: the admission PR merged and the expert is visible in the
   index
 
-The exact markdown syntax for representing these states is deferred to
+The exact Markdown syntax for representing these states is deferred to
 implementation. The architectural requirement is the state machine, not the
 file formatting.
 
@@ -210,14 +210,14 @@ index or audit trail is updated later in a separate reconciliation step.
 
 The self-growth loop uses these role boundaries:
 
-| Role | Owns | Must not do |
-| --- | --- | --- |
-| CEO | sets goal, approves escalations, decides whether to accept broad maintenance outcomes | write expert files or perform library audits directly |
-| PM / `task-splitter` | resolves expert needs, records discovery requests, blocks or retries dispatch, routes escalations | invent expert content, bypass missing-expert gates |
-| Worker | reports missing expertise discovered during execution, then waits or continues only if PM explicitly re-briefs | spawn scout directly or patch the library ad hoc |
-| `expert-scout` | researches one missing expert and prepares one admission candidate | update unrelated library records or redesign taxonomy |
-| `library-maintainer` | audits admissions, refreshes index, records audit results, proposes consolidation or archive PRs | delete experts, rewrite audit history, auto-update upstream drift into content without review |
-| Lifecycle automation | triggers recurring audit runs and routes feedback | make library content decisions by itself |
+| Role                 | Owns                                                                                                           | Must not do                                                                                   |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| CEO                  | sets goal, approves escalations, decides whether to accept broad maintenance outcomes                          | write expert files or perform library audits directly                                         |
+| PM / `task-splitter` | resolves expert needs, records discovery requests, blocks or retries dispatch, routes escalations              | invent expert content, bypass missing-expert gates                                            |
+| Worker               | reports missing expertise discovered during execution, then waits or continues only if PM explicitly re-briefs | spawn scout directly or patch the library ad hoc                                              |
+| `expert-scout`       | researches one missing expert and prepares one admission candidate                                             | update unrelated library records or redesign taxonomy                                         |
+| `library-maintainer` | audits admissions, refreshes index, records audit results, proposes consolidation or archive PRs               | delete experts, rewrite audit history, auto-update upstream drift into content without review |
+| Lifecycle automation | triggers recurring audit runs and routes feedback                                                              | make library content decisions by itself                                                      |
 
 The important boundary is that **only PM decides whether a missing expert
 blocks active work**, and **only maintainer decides whether an admission or
@@ -278,14 +278,14 @@ Have CEO or a human add missing experts and run cleanup by hand.
 
 Rejected because it breaks the stated Round 4 goal of runtime self-growth,
 keeps missing experts as an interrupt-driven human bottleneck, and weakens
-the role boundaries already defined in the repo doctrine.
+the role boundaries already defined in the repository doctrine.
 
 ### 2. Fully automatic background mutation
 
-Let automation discover experts, rewrite indexes, and archive experts in
+Let automation discover experts, rewrite indices, and archive experts in
 the background without a normal PR boundary.
 
-Rejected because it breaks the repo's audit model, hides failures, and
+Rejected because it breaks the repository's audit model, hides failures, and
 makes library state changes harder to review and roll back.
 
 ### 3. Non-blocking discovery
@@ -302,7 +302,7 @@ it already exists.
 
 This ADR intentionally does not decide:
 
-- the exact markdown schema for queue metadata and blocked-state fields
+- the exact Markdown schema for queue metadata and blocked-state fields
 - the exact command surface (`ao send`, `ao spawn`, lifecycle hooks, or
   wrapper scripts) for each trigger
 - whether maintainer amends scout branches directly or only through review
