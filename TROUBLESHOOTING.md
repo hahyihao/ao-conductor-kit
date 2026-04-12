@@ -571,6 +571,28 @@ git branch --list 'feat/*' | xargs -r git branch -D
 
 完成之后再 `ao spawn` 或 `ao batch-spawn` 就不会再因为重复 checkout 失败。
 
+如果冲突发生在 slot lifecycle 恢复阶段，处理方式要更保守一些。不要再手工执行“按模式删光 `kitN-orchestrator-*`”这类命令。优先在仓库根目录运行 helper，让它先检查 AO/tmux 里的健康 session，只清理确认陈旧的 orchestrator worktree，再做 `Git worktree prune`：
+
+```bash
+cd /root/projects/ao-conductor-kit
+
+# 先看 helper 将要做什么
+./tools/start-slot-lifecycle-workers.sh --dry-run
+
+# 确认后再执行真实清理/恢复
+./tools/start-slot-lifecycle-workers.sh
+```
+
+如果 helper 不可用，至少先验证目标 slot 的 orchestrator session 已经不健康，再只删那一个确定陈旧的目录，不要按通配符整片删除：
+
+```bash
+tmux list-sessions -F '#S' | grep 'kit1-orchestrator-1$'
+rm -rf /root/.worktrees/ao-kit-slot-1/kit1-orchestrator-stale-<suffix>
+git worktree prune
+```
+
+仓库里的 `tools/start-slot-lifecycle-workers.sh` 现在会在尝试恢复 slot lifecycle 之前先做这一步，并且把所有 `ao status` / `ao start` 调用固定绑定到仓库根的 `agent-orchestrator.yaml`。这样即使脚本从别的 cwd 运行，也不会误用错误配置；同时即使之前的 `ao session kill` 留下了占坑的 orchestrator worktree，slot 恢复也不会再因为 `already exists` / `already checked out` 直接失败。
+
 ### 预防
 
 1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次上面的清理流程。
