@@ -30,18 +30,18 @@ Last updated: 2026-04-13 (per-expert last-updated refresh)
 
 ## Project experts
 
-| Name             | Domain  | Base skill                                                                  | Last updated | Status |
-| ---------------- | ------- | --------------------------------------------------------------------------- | ------------ | ------ |
-| binance-trading  | project | user-skill:binance-trading-ops                                              | 2026-04-12   | active |
-| chat-analysis    | project | user-skill:chat-analysis                                                    | 2026-04-12   | active |
-| douyin-content   | project | user-skill:douyin-content family                                            | 2026-04-12   | active |
-| game-automation  | project | user-skill:game-automation                                                  | 2026-04-12   | active |
-| novel-reader     | project | user-skill:novel-reader-review                                              | 2026-04-12   | active |
-| qq-bot-audit     | project | user-skill:qq-bot-audit                                                     | 2026-04-12   | active |
-| swarm-commander  | project | user-skill:swarm-commander + pc-init                                        | 2026-04-12   | active |
-| tieba-operation  | project | user-skill:tieba-operation-master                                           | 2026-04-12   | active |
-| xianyu-ops       | project | user-skill:xianyu-ops                                                       | 2026-04-12   | active |
-| ztc-optimizer    | project | user-skill:ztc-optimizer + ztc-patrol + ztc-keyword + ztc-product + ztc-store | 2026-04-12 | active |
+| Name            | Domain  | Base skill                                                                    | Last updated | Status |
+| --------------- | ------- | ----------------------------------------------------------------------------- | ------------ | ------ |
+| binance-trading | project | user-skill:binance-trading-ops                                                | 2026-04-12   | active |
+| chat-analysis   | project | user-skill:chat-analysis                                                      | 2026-04-12   | active |
+| douyin-content  | project | user-skill:douyin-content family                                              | 2026-04-12   | active |
+| game-automation | project | user-skill:game-automation                                                    | 2026-04-12   | active |
+| novel-reader    | project | user-skill:novel-reader-review                                                | 2026-04-12   | active |
+| qq-bot-audit    | project | user-skill:qq-bot-audit                                                       | 2026-04-12   | active |
+| swarm-commander | project | user-skill:swarm-commander + pc-init                                          | 2026-04-12   | active |
+| tieba-operation | project | user-skill:tieba-operation-master                                             | 2026-04-12   | active |
+| xianyu-ops      | project | user-skill:xianyu-ops                                                         | 2026-04-12   | active |
+| ztc-optimizer   | project | user-skill:ztc-optimizer + ztc-patrol + ztc-keyword + ztc-product + ztc-store | 2026-04-12   | active |
 
 ## Language experts
 
