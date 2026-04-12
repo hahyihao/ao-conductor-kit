@@ -89,21 +89,21 @@ brief itself. Do not rely on implied expertise, shorthand role names, or
 
 Use the task shape to choose experts. These mappings are practical defaults:
 
-| Task shape | Inject these experts | Notes |
-| --- | --- | --- |
-| ADRs, architecture decisions, system boundaries, multi-module design | `architect` | Required before dispatch when architecture is materially affected. |
-| Documentation, README updates, runbooks, release notes, wording polish | `writer` | Use for docs-first or prose-quality work. |
-| Ordinary implementation work, bounded feature delivery, straightforward fixes | `code-writer` | Default implementation expert when no narrower specialist is needed. |
-| Debugging, incident reproduction, root-cause isolation, failure triage | `debugger` | Pair with implementers when the task starts from a broken state. |
-| Test additions, regression coverage, flaky-test repair, verification harness work | `test-engineer` | Use when test design or verification quality is a material part of the task. |
-| Refactors, cleanup, simplification, debt paydown without intended behavior change | `refactorer` | Use when the main risk is structural cleanliness rather than new capability. |
-| Shell automation, repo scripts, CI helper scripts, command wrappers | `script-writer` | Use for script-heavy tasks. |
-| Environment, infrastructure, git, config, repo cleanup, file moves | `env-ops` | Required for git/config/cleanup surfaces and other operational work. |
-| Prompt text, agent instructions, prompt templates, evaluation prompts | `prompt-engineer` | Use for prompt or instruction quality work. |
-| Security-sensitive changes, auth, secrets, permissions, trust boundaries | `security-auditor` | Add whenever security posture is a primary concern. |
-| Code review, PR review, review-after-rework | `code-reviewer` | The review role is `code-reviewer`, not a generic reviewer label. |
-| Expert authoring or expert-file restructuring | `expert-writer` | Use when the deliverable itself is an expert doctrine file. |
-| No matching expert, unclear domain ownership, suspected gap in the library | `expert-scout` | Trigger discovery through `experts/discovery-queue.md` and block dispatch until the expert lands. |
+| Task shape                                                                        | Inject these experts | Notes                                                                                             |
+| --------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| ADRs, architecture decisions, system boundaries, multi-module design              | `architect`          | Required before dispatch when architecture is materially affected.                                |
+| Documentation, readme updates, runbooks, release notes, wording polish            | `writer`             | Use for docs-first or prose-quality work.                                                         |
+| Ordinary implementation work, bounded feature delivery, straightforward fixes     | `code-writer`        | Default implementation expert when no narrower specialist is needed.                              |
+| Debugging, incident reproduction, root-cause isolation, failure triage            | `debugger`           | Pair with implementers when the task starts from a broken state.                                  |
+| Test additions, regression coverage, flaky-test repair, verification harness work | `test-engineer`      | Use when test design or verification quality is a material part of the task.                      |
+| Refactors, cleanup, simplification, debt paydown without intended behavior change | `refactorer`         | Use when the main risk is structural cleanliness rather than new capability.                      |
+| Shell automation, repository scripts, CI helper scripts, command wrappers         | `script-writer`      | Use for script-heavy tasks.                                                                       |
+| Environment, infrastructure, Git, config, repository cleanup, file moves          | `env-ops`            | Required for Git/config/cleanup surfaces and other operational work.                              |
+| Prompt text, agent instructions, prompt templates, evaluation prompts             | `prompt-engineer`    | Use for prompt or instruction quality work.                                                       |
+| Security-sensitive changes, auth, secrets, permissions, trust boundaries          | `security-auditor`   | Add whenever security posture is a primary concern.                                               |
+| Code review, PR review, review-after-rework                                       | `code-reviewer`      | The review role is `code-reviewer`, not a generic reviewer label.                                 |
+| Expert authoring or expert-file restructuring                                     | `expert-writer`      | Use when the deliverable itself is an expert doctrine file.                                       |
+| No matching expert, unclear domain ownership, suspected gap in the library        | `expert-scout`       | Trigger discovery through `experts/discovery-queue.md` and block dispatch until the expert lands. |
 
 These mappings are additive. If a task clearly spans multiple rows, inject all
 matching experts. Example: an architecture ADR with a docs handoff needs both
@@ -125,9 +125,11 @@ section such as:
 ## Expert Guidance
 
 ### architect
+
 <task-relevant architect guidance>
 
 ### writer
+
 <task-relevant writer guidance>
 ```
 
