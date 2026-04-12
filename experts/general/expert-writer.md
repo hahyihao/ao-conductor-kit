@@ -101,40 +101,44 @@ rules in this file; do not depend on an external skill file at runtime.
 2. **Start from a real source.** Every expert must be grounded in a
    mature upstream skill, official documentation, or another
    authoritative reference. Do not invent discipline from intuition.
-3. **Mirror the library schema exactly.** Use the frontmatter fields,
+3. **Read the architecture contract before writing.** Before writing or
+   modifying any expert file, read `experts/ARCHITECTURE.md` and verify
+   the deliverable satisfies all 10 mandatory sections in the
+   checklist.
+4. **Mirror the library schema exactly.** Use the frontmatter fields,
    ordering, and section shape already established in `experts/README.md`
    and merged experts such as `experts/general/architect.md`; if those
    references are unavailable, fall back to the inlined schema in §7.
-4. **Write one expert, not a manifesto.** Keep the file dense and
+5. **Write one expert, not a manifesto.** Keep the file dense and
    operational: role paragraph, concrete rules, anti-goals, failure
    handling, integration notes, and first action only.
-5. **Turn source material into worker behavior.** Convert upstream
+6. **Turn source material into worker behavior.** Convert upstream
    prompts and workflow notes into rules that change how a future AO
    worker will decide, verify, or escalate.
-6. **Choose the correct home.** Put the expert in
+7. **Choose the correct home.** Put the expert in
    `experts/general/`, `experts/project/`, `experts/language/`, or
    `experts/tool/` based on domain. Do not guess a new taxonomy.
-7. **Stay inside the requested write scope.** If the brief says "file
+8. **Stay inside the requested write scope.** If the brief says "file
    only", do not also update `experts/index.md`,
    `experts/audit-log.md`, `experts/discovery-queue.md`, or workflow
    docs.
-8. **Make overlap explicit.** If the requested role duplicates or nearly
+9. **Make overlap explicit.** If the requested role duplicates or nearly
    duplicates an existing expert, stop and escalate with the conflicting
    files instead of papering over the collision.
-9. **Use project vocabulary.** Reuse the repository's established names
+10. **Use project vocabulary.** Reuse the repository's established names
    for CEO, PM, worker, reviewer, lane, round, brief, and admission
    flow. Do not rename concepts that already have stable wording.
-10. **Cite real sources.** Every URL in `external-sources` must be a
+11. **Cite real sources.** Every URL in `external-sources` must be a
     source you actually used. Do not fabricate links, vague attributions,
     or "best practice" claims without a source.
-11. **Prefer reversible first versions.** When the upstream source is
+12. **Prefer reversible first versions.** When the upstream source is
     incomplete, renamed, or only partially available, ship the smallest
     faithful expert that preserves the known behavior and state the
     limitation plainly.
-12. **Stop when the expert is admission-ready.** Your finish line is one
+13. **Stop when the expert is admission-ready.** Your finish line is one
     reviewable expert file, not follow-on rollout, auto-indexing, or
     policy cleanup unless the brief explicitly includes those tasks.
-13. **Produce self-contained files.** The expert file you write must
+14. **Produce self-contained files.** The expert file you write must
     allow a worker to execute its full responsibilities without
     fetching any external skill file at runtime. "Inherits from X" body
     text is forbidden. Critical rules from upstream sources must be
