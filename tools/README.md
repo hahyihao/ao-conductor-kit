@@ -30,14 +30,14 @@ npm ci
 
 可用环境变量如下：
 
-| 变量名 | 默认值 | 说明 |
-| --- | --- | --- |
-| `AO_EVENT_SINK_HOST` | `127.0.0.1` | HTTP 监听地址 |
-| `AO_EVENT_SINK_PORT` | `8765` | HTTP 监听端口 |
-| `AO_EVENT_SINK_DIR` | `<repo>/.ao-inbox` | JSONL inbox 输出目录 |
-| `AO_EVENT_SINK_MAX_BODY_BYTES` | `1048576` | 单个 webhook 的最大 body 大小 |
-| `AO_EVENT_SINK_FORWARD_TO` | 空 | 可选；把归一化事件转发到 channel bridge 的 URL |
-| `AO_EVENT_SINK_FORWARD_TIMEOUT_MS` | `3000` | 转发请求超时 |
+| 变量名                             | 默认值             | 说明                                           |
+| ---------------------------------- | ------------------ | ---------------------------------------------- |
+| `AO_EVENT_SINK_HOST`               | `127.0.0.1`        | HTTP 监听地址                                  |
+| `AO_EVENT_SINK_PORT`               | `8765`             | HTTP 监听端口                                  |
+| `AO_EVENT_SINK_DIR`                | `<repo>/.ao-inbox` | JSONL inbox 输出目录                           |
+| `AO_EVENT_SINK_MAX_BODY_BYTES`     | `1048576`          | 单个 webhook 的最大 body 大小                  |
+| `AO_EVENT_SINK_FORWARD_TO`         | 空                 | 可选；把归一化事件转发到 channel bridge 的 URL |
+| `AO_EVENT_SINK_FORWARD_TIMEOUT_MS` | `3000`             | 转发请求超时                                   |
 
 示例：
 
@@ -65,18 +65,18 @@ curl http://127.0.0.1:8765/health
 
 可用环境变量如下：
 
-| 变量名 | 默认值 | 说明 |
-| --- | --- | --- |
-| `AO_CHANNEL_BRIDGE_HOST` | `127.0.0.1` | HTTP 监听地址 |
-| `AO_CHANNEL_BRIDGE_PORT` | `8766` | HTTP 监听端口 |
-| `AO_CHANNEL_BRIDGE_PATH` | `/event` | 接收 AO 事件的 POST 路径 |
-| `AO_CHANNEL_BRIDGE_HEALTH_PATH` | `/health` | 健康检查路径 |
-| `AO_CHANNEL_BRIDGE_MAX_BODY_BYTES` | `1048576` | 单个事件的最大 body 大小 |
-| `AO_CHANNEL_BRIDGE_SERVER_NAME` | `ao-channel-bridge` | Claude Code 里显示的 channel source 名称 |
-| `AO_CHANNEL_BRIDGE_SERVER_VERSION` | `0.1.0` | MCP server version |
-| `AO_CHANNEL_BRIDGE_MAX_PENDING_EVENTS` | `200` | Claude 还没 initialized 时的内存队列上限 |
-| `AO_CHANNEL_BRIDGE_INCLUDE_RAW` | `0` | 设为 `1` 时，把原始 payload 也塞进 channel 文本内容 |
-| `AO_CHANNEL_BRIDGE_INSTRUCTIONS` | 内置默认值 | 覆盖给 Claude Code 的 channel 使用说明 |
+| 变量名                                 | 默认值              | 说明                                                |
+| -------------------------------------- | ------------------- | --------------------------------------------------- |
+| `AO_CHANNEL_BRIDGE_HOST`               | `127.0.0.1`         | HTTP 监听地址                                       |
+| `AO_CHANNEL_BRIDGE_PORT`               | `8766`              | HTTP 监听端口                                       |
+| `AO_CHANNEL_BRIDGE_PATH`               | `/event`            | 接收 AO 事件的 POST 路径                            |
+| `AO_CHANNEL_BRIDGE_HEALTH_PATH`        | `/health`           | 健康检查路径                                        |
+| `AO_CHANNEL_BRIDGE_MAX_BODY_BYTES`     | `1048576`           | 单个事件的最大 body 大小                            |
+| `AO_CHANNEL_BRIDGE_SERVER_NAME`        | `ao-channel-bridge` | Claude Code 里显示的 channel source 名称            |
+| `AO_CHANNEL_BRIDGE_SERVER_VERSION`     | `0.1.0`             | MCP server version                                  |
+| `AO_CHANNEL_BRIDGE_MAX_PENDING_EVENTS` | `200`               | Claude 还没 initialized 时的内存队列上限            |
+| `AO_CHANNEL_BRIDGE_INCLUDE_RAW`        | `0`                 | 设为 `1` 时，把原始 payload 也塞进 channel 文本内容 |
+| `AO_CHANNEL_BRIDGE_INSTRUCTIONS`       | 内置默认值          | 覆盖给 Claude Code 的 channel 使用说明              |
 
 如果你只想在终端里单独验证 bridge 能监听 HTTP，可以直接运行：
 
@@ -111,7 +111,9 @@ WSL 示例：
   "mcpServers": {
     "ao-channel-bridge": {
       "command": "node",
-      "args": ["/mnt/d/脚本程序/agent-orchestrator/tools/ao-channel-bridge.mjs"],
+      "args": [
+        "/mnt/d/脚本程序/agent-orchestrator/tools/ao-channel-bridge.mjs"
+      ],
       "env": {
         "AO_CHANNEL_BRIDGE_HOST": "127.0.0.1",
         "AO_CHANNEL_BRIDGE_PORT": "8766",
@@ -130,7 +132,9 @@ Windows 示例：
   "mcpServers": {
     "ao-channel-bridge": {
       "command": "node",
-      "args": ["D:\\脚本程序\\agent-orchestrator\\tools\\ao-channel-bridge.mjs"],
+      "args": [
+        "D:\\脚本程序\\agent-orchestrator\\tools\\ao-channel-bridge.mjs"
+      ],
       "env": {
         "AO_CHANNEL_BRIDGE_HOST": "127.0.0.1",
         "AO_CHANNEL_BRIDGE_PORT": "8766",
@@ -148,7 +152,7 @@ Windows 示例：
 claude --dangerously-load-development-channels server:ao-channel-bridge
 ```
 
-普通的 `claude --channels ...` 只适用于已经安装或已允许的 channel 插件，不适用于这个 repo 里的本地开发态 bridge。
+普通的 `claude --channels ...` 只适用于已经安装或已允许的 channel 插件，不适用于这个 repository 里的本地开发态 bridge。
 
 ## 5. 端到端测试
 

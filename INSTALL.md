@@ -810,7 +810,9 @@ WSL 示例：
   "mcpServers": {
     "ao-channel-bridge": {
       "command": "node",
-      "args": ["/mnt/d/脚本程序/agent-orchestrator/tools/ao-channel-bridge.mjs"],
+      "args": [
+        "/mnt/d/脚本程序/agent-orchestrator/tools/ao-channel-bridge.mjs"
+      ],
       "env": {
         "AO_CHANNEL_BRIDGE_HOST": "127.0.0.1",
         "AO_CHANNEL_BRIDGE_PORT": "8766",
@@ -850,7 +852,7 @@ claude --dangerously-load-development-channels server:ao-channel-bridge
 - Claude Code 成功启动，不会报 “unknown development channel server”
 - 当 AO 事件到达时，Claude Code 会话中出现 `<channel source="ao-channel-bridge" ...>` 消息
 
-要特别注意一件事：对这个本地 bridge，正确的启动参数是 `--dangerously-load-development-channels server:ao-channel-bridge`，不是 `--channels localhost:8766`。后者适用于普通 channel 插件或允许列表，不适用于这个 repo 里的开发态本地 server。
+要特别注意一件事：对这个本地 bridge，正确的启动参数是 `--dangerously-load-development-channels server:ao-channel-bridge`，不是 `--channels localhost:8766`。后者适用于普通 channel 插件或允许列表，不适用于这个 repository 里的开发态本地 server。
 
 ### 如何验证
 
