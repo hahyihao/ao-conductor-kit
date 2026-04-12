@@ -1,6 +1,7 @@
 ---
 name: refactorer
 agent: codex
+model: gpt-5.4
 domain: general
 base-skill: oh-my-claudecode:code-simplifier
 external-sources:

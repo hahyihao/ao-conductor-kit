@@ -1,6 +1,7 @@
 ---
 name: expert-writer
 agent: codex
+model: gpt-5.4
 domain: general
 description: "Write and revise expert doctrine files for the AO expert library. Actions: receive source material, extract rules, fuse into self-contained expert files, verify quality, open PRs. Triggers: new expert admission, expert revision, expert-scout handoff with raw material. Deliverables: one Markdown expert file matching library schema under experts/."
 base-skill: oh-my-claudecode:skill + oh-my-claudecode:skillify

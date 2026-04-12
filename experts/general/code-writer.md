@@ -1,6 +1,7 @@
 ---
 name: code-writer
 agent: codex
+model: gpt-5.4
 domain: general
 base-skill: oh-my-claudecode:executor
 external-sources:
