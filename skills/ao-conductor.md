@@ -16,6 +16,41 @@ type: skill
 你必须先验证环境，再选择 Mode A、Mode B 或 Mode C，
 并且在行动前明确告诉用户你的模式判断和理由。
 
+## Truth Source
+
+这个 skill 的事实基线按下面顺序取证，不要把记忆、猜测和旧现场混在一起：
+
+1. 当前用户这一轮明确提出的目标、约束、授权范围和交付形态。
+2. 当前仓库里可观察、可复查的配置与工件，例如 `agent-orchestrator.yaml`、`briefs/`、issue、PR、review comment 和已落盘的 parked item。
+3. 当前运行现场的可观察状态，优先级固定为 dashboard 第一、`ao status` 第二、tmux / worktree / 进程诊断第三。
+4. 本 skill 直接引用的权威参考，其中 PM slot 路由看 `skills/references/pm-pool.md`，dispatch 成功验证看 `skills/references/silent-failure-detection.md`，PM 接管 / replacement 看 `skills/references/pm-lifecycle.md`。
+
+如果这些来源彼此冲突，永远先报告冲突，再按更接近当前现场、且更可观察的来源做判断。
+不要用“我记得之前应该是这样”覆盖掉当前可验证事实。
+
+## When to Apply
+
+当用户要求你扮演 CEO / PM 做 dispatch、并行拆分、issue 路由、worker 监控、review / CI 回派、或显式要求使用 AO 时，加载这个 skill。
+当任务是否值得 dispatch 还不明确时，也应该加载这个 skill，但目的是先做模式判断，而不是默认开工派活。
+
+这个 skill 不等于“无论如何都要走 AO”。
+如果判断结果是 `Mode A`，你仍然使用这个 skill 的决策规则，但最终动作应该是直接修改、直接解释、直接排查，而不是为了形式继续派 worker。
+
+## Rule Categories by Priority
+
+低优先级规则不能覆盖高优先级规则。只要前面的优先级没有满足，后面的动作就不能抢跑。
+
+| Priority | Rule Category                  | What it controls                                                                             |
+| -------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| 1        | Truth source and reality check | 先对齐用户目标、仓库事实和当前 AO 现场，不用记忆补完。                                       |
+| 2        | Applicability and mode choice  | 先判定 `Mode A` / `Mode B` / `Mode C`，再决定 direct、single worker 还是 parallel dispatch。 |
+| 3        | Environment bring-up           | 先确认 WSL、`ao`、`codex`、`agent-orchestrator.yaml` 和 orchestrator 可用。                  |
+| 4        | PM pool routing and ownership  | 只把任务交给健康、可观察、可证明 `idle` 的 PM slot，并保持一条清楚的 ownership 链。          |
+| 5        | Brief and issue quality        | 任何要交给 PM / worker 的说明都必须 self-contained，明确文件、边界、约束和验收标准。         |
+| 6        | Delivery transport             | 选择稳定的 `ao send` / `ao batch-spawn` 发送方式、代理设置和路径约定，避免输送层故障。       |
+| 7        | Monitoring and self-heal       | dispatch 后必须做 10 秒验证、持续监控、必要时 self-heal，而不是把“message sent”当完成。      |
+| 8        | Anti-pattern refusal           | 命中反模式时，明确拒绝 dispatch，并用 because-based 理由说明为什么该停。                     |
+
 ## 1. 上下文检查
 
 skill 激活后的第一件事永远是环境检查。
@@ -116,6 +151,32 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 - 若 dispatch 未被验证成功，就立刻 self-heal：补发、补 Enter、重新验证；只有在真实错误、真实交付或需要新决策时才向用户升级
 - zero-backlog 仍然成立；允许推进下一个已显式存在的 canonical item，但禁止靠隐藏 backlog、memo、cache 或 state file 继续派活
 - self-heal 不是无限 retry：同一个 worker session 最多 8 个 turns（含初始 brief）；同一个 failure pattern 累计出现 3 次时，必须 kill 原 worker、spawn fresh worker，并把 failure context 写进 replacement brief / prompt
+
+### 2.4 PM pool dispatch rules
+
+当你进入 `Mode B` 或 `Mode C`，并且项目里存在一个或多个可复用 PM / orchestrator slot 时，先按 PM pool 规则路由，再谈具体发送命令。
+即使 pool 容量只有 1，也仍然要遵守下面这些纪律：
+
+- 只把新任务交给健康、可观察、当前可证明为 `idle` 的 PM slot。`(unknown)`、空白 dashboard、身份映射对不上，都不能当成可派发。
+- PM pool 只接受 canonical item：显式用户请求、已存在的 issue / PR / review thread、当前运行承认的 queue item、或已落盘并被当前会话认可的 parked item。私人 memo、隐藏 backlog 和“我记得还有一项”都不算。
+- 一个 PM slot 默认一次只拥有一条 active dispatch chain。除非已经写清 multiplexing 方案，否则不要把不相关任务塞进同一个 PM。
+- 同一个 issue / batch 不允许同时派给两个 PM slot。ownership、branch / worktree 基线、CI / review 回流链必须一开始就能说清。
+- 如果没有健康 `idle` slot、slot 状态无法归类、或者 ownership 已经冲突，就先修 bring-up / state，再停止 dispatch，不要硬发。
+
+### 2.5 Pre-delivery checklist
+
+在任何一次 `ao send`、`ao batch-spawn` 或向 PM 下发新 brief 之前，至少快速过一遍下面这张清单：
+
+- 我已经向用户明确说明当前是 `Mode A`、`Mode B` 还是 `Mode C`，以及为什么。
+- 当前任务是 canonical item，不靠脑内待办或隐藏状态延续。
+- 目标 PM / worker 当前是健康、可观察、可证明可接单的对象。
+- brief 或消息已经 self-contained，明确写出目标路径、约束、验收标准和输出边界。
+- 如果是 `Mode C`，每个 brief 都已落盘到 `briefs/<slug>.md`，issue 号已成功创建并记录映射。
+- 我已经选好发送方式、代理设置和路径约定，不会在输送层临时拍脑袋。
+- 我准备好了 dispatch 后 10 秒验证和后续监控动作，而不是发完就走。
+- 我知道发出后要把哪些可观察入口回报给用户，例如 orchestrator URL、per-session URL、PR 或 issue 编号。
+
+只要其中任一项答案是否定，就先补齐，再发送。
 
 ## 3. 委派命令标准模式（Stable Dispatch Pattern）
 
@@ -378,15 +439,26 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 4. 如果 `ao status` 仍然显示有 active sessions，就再设置一个 5 分钟后的 `ScheduleWakeup`，继续轮询。
 5. 如果 `ao status` 显示没有 active sessions，就停止轮询，不要续设新的 `ScheduleWakeup`。
 
-## 10. 何时不要使用这个 skill
+## 10. Anti-Patterns
 
-下面这些情况，你应该明确拒绝 dispatch，并说明为什么不适合 AO：
+下面这些情况都属于明确的反模式。命中时，你要直接拒绝 dispatch，并用 because-based 理由说明为什么不能继续。
 
-- 用户说“fix this one typo”。这是 Mode A，直接改，不要建 issue。
-- 用户说“explain what this function does”。这是解释任务，直接解释，不要开 worker。
-- 用户正在互动式调试。比如一边看日志一边追问题，AO 会打断节奏。
-- 当前目录不是 Git repo。AO 依赖 Git 工作流，没有仓库就不该进入派活流程。
-- 仓库没有配置 GitHub remote。`gh` 和 `batch-spawn` 都依赖明确的远程仓库上下文。
+- 用户说“fix this one typo”。
+  Refuse it because 这是 `Mode A` 的单点短改动，dispatch 成本会明显高于直接修改。替代动作是直接改。
+- 用户说“explain what this function does”。
+  Refuse it because 这是即时解释任务，不是需要 issue -> worker -> PR 链路的交付型任务。替代动作是直接阅读代码并解释。
+- 用户正在互动式调试，例如一边看日志一边追问题。
+  Refuse it because 这种任务依赖连续的人机来回和即时试错，AO 会把节奏打碎。替代动作是留在当前会话直接排查。
+- 当前目录不是 Git repo。
+  Refuse it because AO 依赖 branch、commit、PR 和 worktree 这些 Git 基础设施，没有仓库就没有可追踪链路。替代动作是先初始化 Git。
+- 仓库没有配置 GitHub remote。
+  Refuse it because `gh`、issue 创建、PR 追踪和 `batch-spawn` 都需要明确远程仓库上下文。替代动作是先补 remote。
+- 当前没有健康、可观察、可证明为 `idle` 的 PM / orchestrator slot。
+  Refuse it because PM pool 路由前提不成立，强行派发只会制造 ownership 冲突和幽灵 session。替代动作是先修 bring-up / pool snapshot。
+- 当前任务不是 canonical item，只存在于脑内 memo、隐藏 backlog 或含糊的“顺手也做一下”。
+  Refuse it because PM pool 只接受显式存在、可审计、可回流的工作单，隐藏任务会破坏 zero-backlog 和 ownership。替代动作是先把任务写成明确 issue、brief 或已落盘的 parked item。
+- brief 仍然依赖主对话、计划文件或“看上文”，不能 self-contained。
+  Refuse it because worker / PM 看不到你的隐含上下文，继续派发只会造成返工和漂移。替代动作是先把 brief 重写完整。
 
 当你拒绝 dispatch 时，不要只说“不用这个 skill”。
 你要给用户一个替代动作，比如直接修、直接解释、或者先初始化 Git、remote、`agent-orchestrator.yaml` 再继续。
