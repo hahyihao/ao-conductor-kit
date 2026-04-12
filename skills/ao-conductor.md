@@ -59,16 +59,16 @@ type: skill
 
 按优先级 `1 -> 8` 依次判断，不要跳到后面的执行细节再回头补前置治理。
 
-| Priority | Category | Impact | Key Checks | Anti-Patterns |
-| -------- | -------- | ------ | ---------- | ------------- |
-| 1 | Truth Source + Environment Bring-Up | Critical | 先读本文件与 `skills/references/*.md`；确认 `Ubuntu-22.04`、`ao`、`codex`、`agent-orchestrator.yaml`、running orchestrator 都存在 | 凭印象假设 AO 已可用，跳过现场检查 |
-| 2 | Mode Selection | Critical | 先声明 Mode A / B / C；判断任务规模、文件数量、依赖关系、brief 自包含程度 | 小任务强行 dispatch，或把高耦合任务假装可并行 |
-| 3 | PM Pool Routing | Critical | 每个独立工作流分配独立 PM slot；独立性的最低判定是目标输出文件完全不重叠；优先选健康、可观察、空闲的 slot | 把不相关任务叠加到同一繁忙 PM because 上下文膨胀导致任务干扰和执行精度下降；不使用 PM 池槽 because 单 PM 吞吐有限，独立工作流需要独立上下文 |
-| 4 | Pre-Delivery Send Discipline | Critical | `ao send` 前先确认目标是自然语言协调消息、目标 PM 正确、PM context 未过载、WSL 正常；发送后 10 秒内做 dashboard + pane + `ao status` 验证 | `ao send` 前不做 10 秒验证 because 无法确认消息是否被接收；把 `message sent` 当成已派发成功 |
-| 5 | Brief + Issue Quality | High | Mode C brief 必须 self-contained；写清目标文件、事实、Do/Don't、输出约束；issue 与 brief slug 一一对应 | 写“参考上文”“按项目现状自行理解”“其余同前文” |
-| 6 | Spawn + Self-Heal | High | 带代理 spawn / send；每次 fan-out 后确认可观察产物；self-heal 有上限且只基于 canonical item | 把隐式 backlog、memo 或 state file 当成合法待办来源 |
-| 7 | Monitoring + Review + Iteration | High | `ao status` 持续巡检；review 要总结文件、规模、brief 符合度、风险；反馈必须可执行 | CEO 派完就消失，或 review 只给“看起来不错” |
-| 8 | Quality Feedback Loop | Medium | 记录 incident；区分 result / artifact / process / doctrine 四层；只 patch 最深的已证实根因 | 只在聊天里口头总结，不把系统性缺口沉淀成 doctrine / reference / expert 更新 |
+| Priority | Category                            | Impact   | Key Checks                                                                                                                                | Antipatterns                                                                                                                                |
+| -------- | ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | Truth Source + Environment Bring-Up | Critical | 先读本文件与 `skills/references/*.md`；确认 `Ubuntu-22.04`、`ao`、`codex`、`agent-orchestrator.yaml`、running orchestrator 都存在         | 凭印象假设 AO 已可用，跳过现场检查                                                                                                          |
+| 2        | Mode Selection                      | Critical | 先声明 Mode A / B / C；判断任务规模、文件数量、依赖关系、brief 自包含程度                                                                 | 小任务强行 dispatch，或把高耦合任务假装可并行                                                                                               |
+| 3        | PM Pool Routing                     | Critical | 每个独立工作流分配独立 PM slot；独立性的最低判定是目标输出文件完全不重叠；优先选健康、可观察、空闲的 slot                                 | 把不相关任务叠加到同一繁忙 PM because 上下文膨胀导致任务干扰和执行精度下降；不使用 PM 池槽 because 单 PM 吞吐有限，独立工作流需要独立上下文 |
+| 4        | Pre-Delivery Send Discipline        | Critical | `ao send` 前先确认目标是自然语言协调消息、目标 PM 正确、PM context 未过载、WSL 正常；发送后 10 秒内做 dashboard + pane + `ao status` 验证 | `ao send` 前不做 10 秒验证 because 无法确认消息是否被接收；把 `message sent` 当成已派发成功                                                 |
+| 5        | Brief + Issue Quality               | High     | Mode C brief 必须 self-contained；写清目标文件、事实、Do/Don't、输出约束；issue 与 brief slug 一一对应                                    | 写“参考上文”“按项目现状自行理解”“其余同前文”                                                                                                |
+| 6        | Spawn + Self-Heal                   | High     | 带代理 spawn / send；每次 fan-out 后确认可观察产物；self-heal 有上限且只基于 canonical item                                               | 把隐式 backlog、memo 或 state file 当成合法待办来源                                                                                         |
+| 7        | Monitoring + Review + Iteration     | High     | `ao status` 持续巡检；review 要总结文件、规模、brief 符合度、风险；反馈必须可执行                                                         | CEO 派完就消失，或 review 只给“看起来不错”                                                                                                  |
+| 8        | Quality Feedback Loop               | Medium   | 记录 incident；区分 result / artifact / process / doctrine 四层；只 patch 最深的已证实根因                                                | 只在聊天里口头总结，不把系统性缺口沉淀成 doctrine / reference / expert 更新                                                                 |
 
 ## 1. 上下文检查
 
@@ -456,7 +456,7 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 4. 如果 `ao status` 仍然显示有 active sessions，就再设置一个 5 分钟后的 `ScheduleWakeup`，继续轮询。
 5. 如果 `ao status` 显示没有 active sessions，就停止轮询，不要续设新的 `ScheduleWakeup`。
 
-## 10. Anti-Patterns
+## 10. Antipatterns
 
 下面这些动作必须直接拒绝、重路由或降级到更合适的模式。格式固定为“描述 — Refuse it because <理由>”。
 
@@ -469,7 +469,7 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 - 当前目录不是 Git repo，却还要继续 issue / PR 工作流 — Refuse it because AO 依赖可审计的 Git 链路，没有仓库就没有稳定 ownership。
 - 仓库没有配置 GitHub remote，却还要创建 issue / batch-spawn — Refuse it because `gh`、PR、review、CI 都需要明确的远程仓库上下文。
 
-当你拒绝这些 anti-pattern 时，不要只说“不用这个 skill”。
+当你拒绝这些 antipattern 时，不要只说“不用这个 skill”。
 你要立即给出替代动作：Mode A 直接处理、直接解释、继续现场调试，或者先初始化 Git / remote / `agent-orchestrator.yaml` 再回来。
 
 示例对话四：
