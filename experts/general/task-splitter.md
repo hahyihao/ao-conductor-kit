@@ -505,10 +505,16 @@ PR, regardless of which project the PM is managing:
 
 #### Mother disc sync
 
+- Read the current project's optional `windowsMirror` value from
+  `agent-orchestrator.yaml`.
+- If `windowsMirror` has a value, run:
+
 ```bash
-git -C /mnt/d/脚本程序/agent-orchestrator pull origin main
+git -C <windowsMirror> pull origin main
 ```
 
+- If `windowsMirror` is unset or empty, log that no mother disc mirror is
+  configured for the current project and continue.
 - If the pull succeeds, log that the mother disc is synced and continue.
 - If the pull fails for any reason, log a warning that includes the error
   message and continue the rest of the post-merge flow. This failure is
