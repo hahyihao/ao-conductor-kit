@@ -125,7 +125,7 @@ precedence; when silent, the rules below apply.
   input before analysis instead of letting late files get shallow
   treatment.
 - **Evidence or depth is weak**: fail the review gate, send the work
-  back for re-analysis (`补分析`), and do not auto-fix off shallow
+  back for re-analysis (`补分析`), and do not autofix off shallow
   summaries.
 - **A category already changed today or keeps recurring**: deduplicate
   it first, then mark it as repeated or strategy-stale before changing
