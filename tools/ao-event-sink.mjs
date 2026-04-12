@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Accepts AO events, enriches them, writes them to the local inbox log, and can forward summaries.
 
 import http from "node:http";
 import { appendFileSync, mkdirSync } from "node:fs";
