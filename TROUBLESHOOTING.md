@@ -2,9 +2,9 @@
 
 AO 初装故障排查记录
 环境基线：Windows 10 21H1
-记录日期：2026-04-11
+记录日期：2026-04-11 至 2026-04-12
 
-本文只记录 2026-04-11 在 Windows 10 21H1 上首次安装 AO 时真实出现过、并且已经确认修复的问题。
+本文只记录 2026-04-11 至 2026-04-12 在 Windows 10 21H1 上安装和运行 AO 时真实出现过、并且已经确认修复的问题。
 每一节都按“现象、根因、修复、预防”展开。
 如果你遇到的错误信息和这里完全一致，优先按本文的修复路径处理，不要同时叠加多个猜测性的改动。
 
@@ -22,6 +22,7 @@ AO 初装故障排查记录
 - [Issue 10：Codex 提示 `bubblewrap on PATH not found`](#issue-10codex-提示-bubblewrap-on-path-not-found)
 - [Issue 11：tmux 3.2a segfault 导致所有 codex TUI session 神秘死亡](#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)
 - [Issue 12：ao session kill 不清 worktree，新 worker 因 git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
+- [Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端](#issue-14ao-webapi-假死实为卡住的-gh-api-graphql-拖住-nextjs-服务端)
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
@@ -576,6 +577,50 @@ git branch --list 'feat/*' | xargs -r git branch -D
 2. 在母盘里提供一个 `tools/prune-worktrees.sh` 脚本，把清理步骤固化下来。
 3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
 4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
+
+## Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端
+
+### 现象
+
+AO dashboard 或本地 API 明明还在监听 `http://localhost:3000`，但页面一直转圈，某些请求长时间不返回，`ao status` 看起来也像是"web 挂了"。这时最容易做错的一步，是直接把 `next-server` 或整个 Next.js 进程杀掉重启。
+
+但这次故障里，Next.js 服务本身其实还活着。真正卡住的是它拉起的一个 `gh api graphql` 子进程。只要那个子进程不退出，表面上 AO 的 web/API 面就会一直像假死一样，让人误判成 next-server 坏了。
+
+### 根因
+
+AO 的某条 web/API 路径会调用 `gh api graphql`。当这个子进程卡死或永久阻塞时，相关的 Next.js server handler 也会一直挂住，表现上等同于 Node.js 事件循环被这条调用拖住。结果是：**AO web/API 表面不可用，但 next-server 进程本身未必已经损坏。**
+
+所以这类故障的根因不是"Next.js 服务自己死了"，而是"一个卡住的 `gh api graphql` 子进程把服务端请求链路拖死了"。
+
+### 修复
+
+先确认 Next.js 服务进程还在，然后只处理卡住的 `gh api graphql`，不要先杀 next-server。
+
+```bash
+# 1. 先看 Next.js 服务是否仍然活着
+ps -eo pid,etime,command | grep -E 'next-server|node .*next' | grep -v grep
+
+# 2. 找出卡住的 gh api graphql 子进程
+ps -eo pid,ppid,etime,stat,command | grep 'gh api graphql' | grep -v grep
+
+# 3. 只杀掉那个长时间不退出的 gh 进程
+kill -9 <stuck-gh-pid>
+
+# 4. 验证 web/API 是否恢复，而 next-server PID 是否保持不变
+curl -I http://localhost:3000
+ps -eo pid,etime,command | grep -E 'next-server|node .*next' | grep -v grep
+```
+
+如果第 1 步里还能看到 Next.js 进程，就**不要**把它当成首要处置对象。正确顺序是：先清掉卡住的 `gh api graphql`，再回头验证 `http://localhost:3000` 是否恢复响应。本次故障里，这样处理后 AO web/API 就恢复了，不需要重启 Next.js 服务。
+
+如果你同时看到多个 `gh api graphql`，优先处理那个 `etime` 已经明显异常、且与当前卡住请求对应的进程。不要无差别把所有 node/next 相关进程一起杀掉，否则会把原本健康的服务也打断。
+
+### 预防
+
+1. 看到 dashboard 或 API 卡住时，第一步先查 `gh api graphql`，不要条件反射先 `kill` Next.js。
+2. 诊断时把"服务进程是否还活着"和"服务内部是否有阻塞子进程"分开看，不要把两者混成一个问题。
+3. 运维值守时保留一条现成命令：`ps -eo pid,ppid,etime,stat,command | grep 'gh api graphql' | grep -v grep`，能比盲目重启更快定位真因。
+4. 只有在确认 next-server 自己已经退出、崩溃，或杀掉卡住的 `gh api graphql` 后仍然完全无响应时，才继续排查 Next.js 本身。
 
 ## 误诊链路（历史记录）
 
