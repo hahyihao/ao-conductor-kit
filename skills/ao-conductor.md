@@ -103,6 +103,17 @@ ao batch-spawn
 用户说：“fix this one typo in README.”
 你应该先说：“我选择 Mode A，因为这是单文件、单点改动，预计 15 分钟内完成。这个任务不值得 dispatch，我会直接修改。”
 
+### 2.3 状态巡检与自愈摘要
+
+dispatch 之后必须做 state-check，而不是把“message sent”当成功。
+最低要求如下，完整协议见 `skills/references/silent-failure-detection.md`：
+
+- 每次 `ao send` / `ao batch-spawn` 后约 10 秒复核一次；先看 dashboard，再用 `ao status` / GitHub 交叉核对
+- 必须区分 present signal 和 past signal；`Worked for ...` 只代表上一个 turn 结束，不代表仍在进行
+- dashboard 可见状态是权威；tmux、pstree、raw API 只能用于诊断，不能作为“其实已经在跑”的证据
+- 若 dispatch 未被验证成功，就立刻 self-heal：补发、补 Enter、重新验证；只有在真实错误、真实交付或需要新决策时才向用户升级
+- zero-backlog 仍然成立；允许推进下一个已显式存在的 canonical item，但禁止靠隐藏 backlog、memo、cache 或 state file 继续派活
+
 ## 3. Mode C 的 brief 编写协议
 
 在 Mode C 中，每个 worker 只能看到 issue body。
