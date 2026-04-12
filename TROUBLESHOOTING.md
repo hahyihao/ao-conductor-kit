@@ -910,8 +910,9 @@ GIT_TRACE_CURL=1 GIT_CURL_VERBOSE=1 git push
 **报错**：`--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons`
 
 **原因**：claude-code cli.js 硬编码了 root 检查：
+
 ```js
-if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1)
+if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1);
 ```
 
 **修复**：设置 `IS_SANDBOX=1` 环境变量。
@@ -921,6 +922,7 @@ if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1)
 **原因**：AO 的 claude-code plugin `getEnvironment()` 只传 `CLAUDECODE`、`AO_SESSION_ID` 等少数几个变量，不继承父进程 env。tmux 的 `-e KEY=VALUE` 只传插件返回的那些，`IS_SANDBOX=1` 以及 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 都不会自动带入。
 
 **修复**：用 tmux 全局环境变量，所有新 session 自动继承：
+
 ```bash
 tmux set-environment -g IS_SANDBOX 1
 tmux set-environment -g ANTHROPIC_BASE_URL http://www.hahakaifa.cn:7892
@@ -937,6 +939,7 @@ tmux set-environment -g CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC 1
 **原因**：claude-code 第一次以 bypass 模式运行时弹 dialog，接受后写入用户设置文件跳过后续弹框。
 
 **修复**：直接预创建设置文件，跳过 dialog：
+
 ```bash
 echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 ```
@@ -950,6 +953,7 @@ echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
 **原因**：`ao stop` 停了 AO manager 进程，但旧的 next-server 子进程没被 kill，继续占用 3000。
 
 **修复**：重启前先确认端口释放：
+
 ```bash
 ss -tlnp | grep 3000   # 找到占用的 PID
 kill <PID>             # 或 tmux kill-session -t ao-server
@@ -1003,7 +1007,7 @@ EOF
 **Step 2：用 Python one-liner 调 `ao send`**
 
 ```bash
-# 把 kit-NNN 换成真实 session id，把 <task-name> 换成上一步的文件名。
+# 把 kit-NNN 换成真实 session ID，把 <task-name> 换成上一步的文件名。
 # Python 负责组 argv，绕过 bash 对单引号的解释；
 # [:500] 负责把发送长度压到稳定范围内，避开已知 F7 stuck input bug。
 python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/root/<task-name>.txt').read().strip()[:500]], check=True)"
@@ -1011,7 +1015,7 @@ python3 -c "import subprocess; subprocess.run(['ao','send','kit-NNN', open('/roo
 
 使用时替换两处占位符：
 
-- `kit-NNN` 换成真实的 orchestrator / PM session id
+- `kit-NNN` 换成真实的 orchestrator / PM session ID
 - `/root/<task-name>.txt` 换成你的实际 brief 文件
 
 这个模板的实际含义是：**先把完整文本安全落盘，再把其前 500 个字符稳定送进 `ao send`**。
