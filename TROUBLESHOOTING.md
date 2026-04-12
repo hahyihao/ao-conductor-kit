@@ -586,7 +586,7 @@ cd /root/projects/ao-conductor-kit
 如果 helper 不可用，至少先验证目标 slot 的 orchestrator session 已经不健康，再只删那一个确定陈旧的目录，不要按通配符整片删除：
 
 ```bash
-tmux has-session -t kit1-orchestrator-1
+tmux list-sessions -F '#S' | grep 'kit1-orchestrator-1$'
 rm -rf /root/.worktrees/ao-kit-slot-1/kit1-orchestrator-stale-<suffix>
 git worktree prune
 ```

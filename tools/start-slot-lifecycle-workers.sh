@@ -102,13 +102,18 @@ EOF
 }
 
 tmux_session_active() {
-	local session_name="$1"
+	local expected_name="$1"
+	local session_name
 
 	if ! command -v tmux >/dev/null 2>&1; then
 		return 1
 	fi
 
-	tmux has-session -t "$session_name" 2>/dev/null
+	while IFS= read -r session_name; do
+		[[ "$session_name" == "$expected_name" || "$session_name" == *-"$expected_name" ]] && return 0
+	done < <(tmux list-sessions -F '#S' 2>/dev/null || true)
+
+	return 1
 }
 
 slot_orchestrator_is_healthy() {
@@ -177,7 +182,7 @@ slot_has_healthy_orchestrator() {
 	fi
 
 	while IFS= read -r session_name; do
-		[[ "$session_name" == "$slot_prefix"* ]] && return 0
+		[[ "$session_name" == "$slot_prefix"* || "$session_name" == *-"$slot_prefix"* ]] && return 0
 	done < <(tmux list-sessions -F '#S' 2>/dev/null || true)
 
 	return 1
