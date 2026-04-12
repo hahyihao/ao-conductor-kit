@@ -34,6 +34,7 @@
   - `experts/project/douyin-content.md`
   - `experts/project/swarm-commander.md`
 - **配套交付已落地**：`docs/round-3-plan.md`、`tools/ao-event-sink.mjs`、tmux/bootstrap 加固、stale slot/worktree 恢复修复、专家库索引刷新，已经把第 2 轮到第 3 轮之间的运维断点补齐。
+- **PATH 污染 hotfix 已接入 kit**：新增 `patches/ao-main-2ebe111a-sanitize-windows-path.patch`，并在 `INSTALL.md` / `TROUBLESHOOTING.md` 写明适用边界与 operator 应用步骤。这个 hotfix 不适用于裸 `@composio/ao@0.2.2` tag，而是面向较新的 upstream `main` 结构。
 
 ### 当前仍在跟进的事
 
