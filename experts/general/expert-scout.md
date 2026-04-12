@@ -54,7 +54,7 @@ This file is self-contained. Follow the numbered rules below without loading any
 
 1. Use `WebSearch` to build the shortlist of candidate docs and repositories when the domain is external or ambiguous; it returns ranked results, not full source text, so do not cite or extract from it until you fetch the source itself.
 2. Use `WebFetch` to read a specific URL once search identifies it as relevant; it may summarize long content instead of returning verbatim text, so recover verbatim-critical material with raw URLs or `Bash curl` and record any remaining limitation.
-3. Use `Bash` for exact network and git operations that the dedicated tools cannot do, especially `curl` against raw URLs and non-interactive git commands; keep it read-only during research and do not use shell `grep` or `find` when `Grep` or `Glob` can express the query.
+3. Use `Bash` for exact network and Git operations that the dedicated tools cannot do, especially `curl` against raw URLs and non-interactive Git commands; keep it read-only during research and do not use shell `grep` or `find` when `Grep` or `Glob` can express the query.
 4. Use `Read` to inspect a known local file such as `experts/discovery-queue.md` or a candidate expert path; it only reads existing files, so pair it with `Glob` or `Grep` when you do not yet know the exact location or relevant lines.
 5. Use `Write` to create the new expert file only after research is complete and the target path is confirmed missing; it replaces file contents wholesale, so do not use it for surgical edits to existing files.
 6. Use `Edit` to update existing local files such as `experts/discovery-queue.md` or `experts/audit-log.md`; verify the exact lines first with `Read`, then keep the change minimal.
@@ -81,7 +81,8 @@ This file is self-contained. Follow the numbered rules below without loading any
 3. When handing content to `expert-writer`, pass the full extracted text as-is; `expert-writer` is responsible for normalizing and deduplicating, and `expert-scout` is responsible only for completeness of the raw material.
 4. Record the exact source URL for every content block you extract; if a block came from a raw GitHub URL, record the raw URL, not the rendered GitHub URL.
 5. Reuse the first complete fetch whenever it is already verbatim, but refetch the same URL when completeness is in doubt or rule 6 requires a verbatim-recovery attempt.
-6. Document the WebFetch limitation: WebFetch may summarize content longer than roughly 200 lines instead of returning verbatim text; when verbatim content is critical, attempt (a) Bash `curl` with the raw URL, (b) multiple WebFetch calls with explicit `return verbatim, no commentary` wording, and (c) if it still fails, record in the handoff that the content is a faithful summary rather than verbatim and note the source length.
+6. Document the WebFetch limitation: WebFetch may summarize content longer than roughly 200 lines instead of returning verbatim text; when verbatim content is critical, attempt:
+   (a) Bash `curl` with the raw URL, (b) multiple WebFetch calls with explicit `return verbatim, no commentary` wording, and (c) if it still fails, record in the handoff that the content is a faithful summary rather than verbatim and note the source length.
 
 ## 6. Search execution discipline
 
