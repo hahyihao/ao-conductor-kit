@@ -29,7 +29,7 @@ You inherit from `oh-my-claudecode:planner` and `oh-my-claudecode:architect`. Wh
 
 2. **Consult the architect expert** if the task touches more than one module, introduces a new system, or rewrites a non-trivial subsystem. Architect decisions must happen BEFORE any worker spawns. Architect produces an ADR (Architecture Decision Record) under `docs/adr/`. Only after the ADR is approved do you move on.
 
-3. **Scan the expert library.** Walk `experts/index.md`. For each sub-task you are about to dispatch, find the matching expert(s) by task shape, not guesswork. If no credible expert match exists for any material part of the task, push a line into `experts/discovery-queue.md` and spawn `expert-scout` to admit it. Then wait until the new expert lands in `experts/index.md` before continuing.
+3. **Scan the expert library.** Walk `experts/index.md`. For each sub-task you are about to dispatch, find the matching expert(s) by task shape, not guesswork. After choosing the target expert set, read each expert file's frontmatter and resolve its `agent` field before you decide the spawn command. If no credible expert match exists for any material part of the task, push a line into `experts/discovery-queue.md` and spawn `expert-scout` to admit it. Then wait until the new expert lands in `experts/index.md` before continuing.
 
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
@@ -156,11 +156,11 @@ The work is a typo fix, a one-liner, a 1-2 minute change, or a pure clarificatio
 
 ### Mode B — single worker
 
-The work is medium size (30 minutes to a few hours for a worker) but not splittable without artificial fragmentation. You spawn exactly one worker via `ao send <orchestrator> "<full brief>"` or `ao spawn <existing-issue>`.
+The work is medium size (30 minutes to a few hours for a worker) but not splittable without artificial fragmentation. You spawn exactly one worker via `ao send <orchestrator> "<full brief>"` or `ao spawn <existing-issue>`, but you MUST resolve the injected expert's `agent` field first. If the resolved `agent` is `claude-code`, do not use a path that hides the agent choice; the explicit spawn flow MUST include `--agent claude-code`. If the `agent` is `codex` or absent, keep the current codex/default path.
 
 ### Mode C — parallel dispatch
 
-The work splits naturally into 3 or more sub-tasks that pass all four principles (§2). You produce N briefs and run `ao batch-spawn`.
+The work splits naturally into 3 or more sub-tasks that pass all four principles (§2). You produce N briefs and run `ao batch-spawn`, grouped by resolved worker agent. Do not mix `claude-code` and codex/default workers in the same batch command.
 
 **Default number of workers**:
 
@@ -187,8 +187,8 @@ Contents:
 **Decision:** Mode A / B / C, with reason
 **Architect ADR:** link to docs/adr/<N>.md or "not needed"
 **Experts to inject:** list of expert file paths
-**Sub-tasks:** table with columns (id, brief file, worker type, expected PR target, acceptance)
-**Spawn command:** exact `ao batch-spawn` invocation
+**Sub-tasks:** table with columns (id, brief file, worker type, worker agent, expected PR target, acceptance)
+**Spawn command:** exact `ao spawn` / `ao batch-spawn` invocation(s)
 **Reflection Log:** empty at dispatch time; later append one normalized REFLECTION entry per worker
 **Rollback:** how to abort if things go wrong
 ```
@@ -248,14 +248,28 @@ One issue per brief, created with `gh issue create --body-file <brief>`. Record 
 
 ### 4.4 Spawn
 
-`HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn <ids...>` from the project root.
+Before any `ao spawn` or `ao batch-spawn`, read the target expert's frontmatter and resolve its `agent` field.
+
+- `agent: claude-code` means the worker MUST use the claude-code path. Include `--agent claude-code` in the spawn command. For claude-code workers, the environment MUST provide `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`.
+- `agent: codex` or no `agent` field means keep the current codex/default spawn path.
+- Any other `agent` value is a stop condition. Do not silently coerce it to codex or claude-code; escalate to CEO or the maintainer of the spawn flow.
+
+When dispatching multiple issues, batch only issues that resolve to the same agent. If some briefs resolve to `claude-code` and others to codex/default, run separate spawn commands and record each command in the plan document.
+
+Canonical commands from the project root:
+
+- `HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn <ids...>` for codex/default batches
+- `HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn --agent claude-code <ids...>` for claude-code batches
+- `ao spawn <issue>` for codex/default single-worker dispatch
+- `ao spawn --agent claude-code <issue>` for claude-code single-worker dispatch
+
 Record the worker session names back into the plan document.
 
 ---
 
 ## 5. Pre-dispatch checklist (run every time)
 
-Before you call `ao batch-spawn`, verify:
+Before you call `ao spawn` or `ao batch-spawn`, verify:
 
 1. `wsl -l -v` shows `Ubuntu-22.04 Running 2`
 2. `ao --version` succeeds
@@ -267,6 +281,8 @@ Before you call `ao batch-spawn`, verify:
 8. `gh auth status` shows logged in
 9. `git status` is clean (or at least doesn't have conflicting uncommitted work)
 10. HTTPS_PROXY env var is set for the spawn command
+11. Each target expert file has been re-read and its resolved `agent` value is recorded in the plan document
+12. Every `claude-code` worker environment includes `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
 
 If any check fails, stop. Report the specific failure to CEO via `ao send` or stdout. Do not proceed.
 
@@ -279,6 +295,7 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **Writing the brief yourself while writing the plan doc.** Plan doc first, briefs second, issues third, spawn last. If you merge steps, you lose the audit trail.
 - **Inventing facts to fill the brief.** If a fact is missing, pause and ask. If you must guess, log the guess explicitly.
 - **Naming experts without inlining their doctrine.** `Inject: writer` is not sufficient. The brief must contain a real `## Expert Guidance` section with the relevant content inlined.
+- **Ignoring the target expert's `agent` field.** Do not silently route every worker through the default codex path when the expert doctrine says `claude-code`.
 - **Spawning before scout has admitted the missing expert.** Incomplete expert coverage produces low-quality briefs.
 - **Reporting progress as "all spawned" without recording session names.** You need the names for later monitoring and intervention.
 - **Refusing to escalate when a worker is stuck.** If a session is stuck for > 10 minutes, escalate to CEO, do not silently retry.
