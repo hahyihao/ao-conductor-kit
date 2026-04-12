@@ -189,8 +189,15 @@ Contents:
 **Experts to inject:** list of expert file paths
 **Sub-tasks:** table with columns (id, brief file, worker type, expected PR target, acceptance)
 **Spawn command:** exact `ao batch-spawn` invocation
+**Reflection Log:** empty at dispatch time; later append one normalized REFLECTION entry per worker
 **Rollback:** how to abort if things go wrong
 ```
+
+The plan document is also the PM-side reflection accumulator. Create a
+`## Reflection Log` section in every plan file and keep it empty until workers
+finish. After each worker handoff, append that worker's normalized
+`REFLECTION` entry together with the source brief, issue, worker session, and
+PR number so CEO can review the batch later without reopening every thread.
 
 ### 4.2 Brief files
 
@@ -217,6 +224,23 @@ approved path. If retry still fails, or the failure is not safely retryable,
 the worker MUST explicitly report `blocked` or `output-stuck` with the failing
 command, the error, and the last successful delivery step. The worker MUST NOT
 report the task as done until the PR exists.
+
+Every worker brief MUST also require exactly one terminal `REFLECTION` entry in
+the final handoff. The worker writes this once, after finishing the task, using
+the following shape:
+
+```markdown
+## REFLECTION
+
+- Decisions made: <important implementation or process choices>
+- Pitfalls found: <traps, surprises, or failure modes encountered>
+- Rules that helped: <existing doctrine / expert / checklist that helped, or "none">
+- Rules missing or unclear: <missing guidance that would have reduced risk, or "none">
+```
+
+Do not ask for a running diary and do not allow multiple scattered reflections.
+The goal is one normalized learning artifact per worker task that PM can
+accumulate across a batch.
 
 ### 4.3 GitHub issues
 
@@ -300,6 +324,13 @@ Every time you dispatch, write the plan document. Every time a worker returns, a
 
 When CEO later asks "what did you do today?", you point at the plan documents in `briefs/plans/`. That is your audit trail.
 
+For completed worker tasks, the plan document MUST also keep the accumulated
+reflection trail. Copy each worker's `REFLECTION` entry into the plan's
+`## Reflection Log` with source metadata intact. If two or more entries point to
+the same repeated pitfall, missing rule, or especially helpful doctrine, append
+a short `## Batch Reflection Summary` note so CEO can decide whether the batch
+warrants a `skill-optimizer` or quality-feedback follow-up.
+
 ---
 
 ## 11. Your first action in any session
@@ -340,6 +371,7 @@ Every worker brief MUST restate the goal in concrete task language and MUST decl
 - a do-not-touch list that names forbidden files, directories, and out-of-scope surfaces
 - an `## Expert Guidance` section that inlines the task-relevant doctrine for every injected expert
 - an output contract that states the required delivery format
+- a `REFLECTION` requirement that asks for exactly one terminal reflection entry
 - a done-criteria / output-verification section that defines the handoff completion gate
 - acceptance and verification requirements that define how completion will be checked
 
@@ -384,13 +416,29 @@ Every worker handoff MUST include an evidence bundle. A delivery without evidenc
 - commands run
 - observed results
 - changed files
+- one terminal `REFLECTION` entry covering decisions made, pitfalls found, and rules that helped or were missing
 - delivery-state proof for `git commit`, `git push origin`, and `gh pr create`, or an explicit `blocked` / `output-stuck` report that names the failed step and error
 - a verification mapping that ties each acceptance requirement to proof
 - remaining risks or follow-up concerns
 
 You MUST ask for this bundle in the brief and MUST treat missing evidence as a failed gate, even if the code diff looks plausible. PM MUST use this delivery-state evidence to distinguish `working` / in-progress execution from `working-but-output-stuck` when implementation is complete but PR creation is blocked.
 
-### 12.7 Re-review is mandatory after any substantive rework
+### 12.7 PM reflection accumulation is mandatory
+
+PM MUST collect worker reflections; do not leave them stranded inside separate
+worker threads. For every completed worker task:
+
+- verify the handoff contains exactly one `REFLECTION` entry
+- append that entry to the plan document's `## Reflection Log`
+- preserve source metadata: brief path, issue, worker session, and PR
+- keep recurring themes visible in `## Batch Reflection Summary` instead of
+  paraphrasing them away
+
+This log is a batch-review input for CEO. It is not yet a doctrine patch by
+itself, but it gives CEO a compact artifact to inspect when deciding whether
+the pattern should escalate into `skill-optimizer` or quality-feedback work.
+
+### 12.8 Re-review is mandatory after any substantive rework
 
 Any substantive rework after review MUST go through review again. A prior reviewer verdict MUST NOT carry forward automatically once the implementation has materially changed. PM and implementer alike MUST NOT skip re-review on the theory that the patch is "small", "just a fixup", or "only a follow-up tweak".
 
