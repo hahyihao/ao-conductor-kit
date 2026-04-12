@@ -2,9 +2,9 @@
 
 AO 初装故障排查记录
 环境基线：Windows 10 21H1
-记录日期：2026-04-11
+记录日期：2026-04-11 至 2026-04-12
 
-本文只记录 2026-04-11 在 Windows 10 21H1 上首次安装 AO 时真实出现过、并且已经确认修复的问题。
+本文只记录 2026-04-11 至 2026-04-12 在 Windows 10 21H1 上安装和运行 AO 时真实出现过、并且已经确认修复的问题。
 每一节都按“现象、根因、修复、预防”展开。
 如果你遇到的错误信息和这里完全一致，优先按本文的修复路径处理，不要同时叠加多个猜测性的改动。
 
@@ -21,7 +21,8 @@ AO 初装故障排查记录
 - [Issue 9：Codex 直连测试 `/responses` 返回 200 但没有输出内容](#issue-9codex-直连测试-responses-返回-200-但没有输出内容)
 - [Issue 10：Codex 提示 `bubblewrap on PATH not found`](#issue-10codex-提示-bubblewrap-on-path-not-found)
 - [Issue 11：tmux 3.2a segfault 导致所有 codex TUI session 神秘死亡](#issue-11tmux-32a-segfault-导致所有-codex-tui-session-神秘死亡)
-- [Issue 12：ao session kill 不清 worktree，新 worker 因 git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
+- [Issue 12：ao session kill 不清 worktree，新 worker 因 Git checkout 冲突立刻 exit](#issue-12ao-session-kill-不清-worktree新-worker-因-git-checkout-冲突立刻-exit)
+- [Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端](#issue-14ao-webapi-假死实为卡住的-gh-api-graphql-拖住-nextjs-服务端)
 - [误诊链路（历史记录）](#误诊链路历史记录)
 - [调试技巧](#调试技巧)
 - [已知无害警告](#已知无害警告)
@@ -248,8 +249,8 @@ orchestrator 这类多轮代理默认用 `tmux`，不要图省事改成 `process
 
 在 WSL 里执行 `curl https://api.github.com`，不到 1 秒就能返回 `200 OK`。
 但同一台机器上执行 `git push origin main` 却会无限挂起，没有报错，也没有进度。
-`ps` 看得到 git 进程还活着，可 CPU 占用接近 0%，明显是在等一个不会回来的 socket。
-这会误导人以为 GitHub 端限流，或者 git 本身坏了。
+`ps` 看得到 Git 进程还活着，可 CPU 占用接近 0%，明显是在等一个不会回来的 socket。
+这会误导人以为 GitHub 端限流，或者 Git 本身坏了。
 事实上网络栈只对短请求看起来正常，对长连接上传并不正常。
 
 ### 根因
@@ -269,7 +270,7 @@ GitHub 域名在 Clash 视角下会得到 fake IP。
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\repair-wsl2-localhost-forwarding.ps1 -DistroName Ubuntu-22.04 -ListenPort 7897 -ConnectPort 7897
 ```
 
-第二段是在 WSL 里先动态取当前 Windows host IP，再同时配置 git 代理，并在实际 push 命令前显式导出环境变量。
+第二段是在 WSL 里先动态取当前 Windows host IP，再同时配置 Git 代理，并在实际 push 命令前显式导出环境变量。
 单写 `git config` 对大推送并不总是可靠，这次真正稳定的是“配置加环境变量”一起用。
 
 ```bash
@@ -297,20 +298,20 @@ HTTPS_PROXY="http://${WSL_HOST_IP}:7897" git push -u origin main
 但请求一到 GitHub 就马上返回 `HTTP/2 401`，响应头里还有 `www-authenticate: Basic realm="GitHub"`。
 这说明链路已经通了，问题从“网络不通”切换成了“认证失败”。
 由于之前已经执行过 `gh auth login --with-token`，这一步最容易让人误以为是 token 权限不足。
-其实这次失败不是 token 无效，而是 git 根本没有用到它。
+其实这次失败不是 token 无效，而是 Git 根本没有用到它。
 
 ### 根因
 
 `gh auth login --with-token` 只是在配置 GitHub CLI 自己的认证状态。
-它不会自动把 git 的 credential helper 改成 `gh`。
+它不会自动把 Git 的 credential helper 改成 `gh`。
 所以 `gh auth status` 看起来可能一切正常，但 `git push` 仍然会发匿名请求。
 GitHub 收到匿名写入请求后，自然返回 401。
 换句话说，`gh` 已登录并不等于 `git` 已有可用凭据。
 
 ### 修复
 
-执行一次 `gh auth setup-git`，让 git 把 `gh` 注册为凭据辅助程序。
-这一步会写入 `~/.gitconfig`，之后 git 就知道该去问 `gh` 拿 token 了。
+执行一次 `gh auth setup-git`，让 Git 把 `gh` 注册为凭据辅助程序。
+这一步会写入 `~/.gitconfig`，之后 Git 就知道该去问 `gh` 拿 token 了。
 本次安装里实际执行的是下面这组命令。
 
 ```bash
@@ -343,7 +344,7 @@ Bootstrap 脚本里必须把登录和 setup-git 放在同一个流程里。
 ### 根因
 
 AO 的 `spawn` 和 `batch-spawn` 会主动去 GitHub 读取 issue 标题、正文和上下文。
-这些数据不是从本地 git 仓库里推出来的，而是通过 GitHub CLI 获取。
+这些数据不是从本地 Git 仓库里推出来的，而是通过 GitHub CLI 获取。
 如果系统里没有 `gh`，AO 就缺少访问 GitHub issue 的入口。
 因此它不能安全地构造 worker session 的首条任务说明。
 这不是一个“体验降级”，而是启动条件不满足。
@@ -523,10 +524,10 @@ ao start
 
 1. `scripts/bootstrap-ao.sh` 应该在安装完 apt 的 tmux 之后，立刻执行上面的源码升级步骤，而不是依赖 apt 版本。
 2. 任何 `ao doctor` 或启动脚本都应该在启动前检查 `tmux -V` 是否大于 3.3，不够就拒绝启动并提示升级。
-3. 在 README 里显式写明："Ubuntu 22.04 的 apt tmux 不可用"。
+3. 在 readme 里显式写明："Ubuntu 22.04 的 apt tmux 不可用"。
 4. 任何 "session 无故 exit/killed" 的诊断流程，第一步都要先 `dmesg 2>&1 | grep -i "tmux\|segfault\|oom"`，不要先看应用层日志。
 
-## Issue 12：ao session kill 不清 worktree，新 worker 因 git checkout 冲突立刻 exit
+## Issue 12：ao session kill 不清 worktree，新 worker 因 Git checkout 冲突立刻 exit
 
 ### 现象
 
@@ -546,13 +547,13 @@ fatal: 'feat/issue-4' is already checked out at '/root/.worktrees/ao-kit/kit-7'
 - 不调用 `git branch -D` 删除对应的 feature 分支
 - 不清理 `/root/.agent-orchestrator/<project>/sessions/<session>` 里的日志和状态
 
-于是下一次尝试 `ao spawn` 到同一个 issue（分支自动派生自 issue 编号）时，git 看到这个分支已经被一个 worktree 占用了，就拒绝再次 checkout，worker 立刻以错误退出。
+于是下一次尝试 `ao spawn` 到同一个 issue（分支自动派生自 issue 编号）时，Git 看到这个分支已经被一个 worktree 占用了，就拒绝再次 checkout，worker 立刻以错误退出。
 
 这在一次尝试里可能只影响一个 session，但如果你连续 `ao session kill` 很多次再重试，磁盘上会留下多个"看得见但占坑"的 worktree，让后续 spawn 全部失败。
 
 ### 修复
 
-清理前一次的 worktree，再让 git 清理自己的记账：
+清理前一次的 worktree，再让 Git 清理自己的记账：
 
 ```bash
 cd /root/projects/<your-project>
@@ -577,6 +578,50 @@ git branch --list 'feat/*' | xargs -r git branch -D
 3. 如果一个 session `exited` 但没有产出 PR，第一反应是"检查 worktree 是否冲突"，不要立刻怀疑 codex。
 4. 长期方案是等 AO 上游把 #1129 修掉。这之前要一直自己维护清理脚本。
 
+## Issue 14：AO web/API 假死，实为卡住的 `gh api graphql` 拖住 Next.js 服务端
+
+### 现象
+
+AO dashboard 或本地 API 明明还在监听 `http://localhost:3000`，但页面一直转圈，某些请求长时间不返回，`ao status` 看起来也像是"web 挂了"。这时最容易做错的一步，是直接把 `next-server` 或整个 Next.js 进程杀掉重启。
+
+但这次故障里，Next.js 服务本身其实还活着。真正卡住的是它拉起的一个 `gh api graphql` 子进程。只要那个子进程不退出，表面上 AO 的 web/API 面就会一直像假死一样，让人误判成 next-server 坏了。
+
+### 根因
+
+AO 的某条 web/API 路径会调用 `gh api graphql`。当这个子进程卡死或永久阻塞时，相关的 Next.js server handler 也会一直挂住，表现上等同于 Node.js 事件循环被这条调用拖住。结果是：**AO web/API 表面不可用，但 next-server 进程本身未必已经损坏。**
+
+所以这类故障的根因不是"Next.js 服务自己死了"，而是"一个卡住的 `gh api graphql` 子进程把服务端请求链路拖死了"。
+
+### 修复
+
+先确认 Next.js 服务进程还在，然后只处理卡住的 `gh api graphql`，不要先杀 next-server。
+
+```bash
+# 1. 先看 Next.js 服务是否仍然活着
+ps -eo pid,etime,command | grep -E 'next-server|node .*next' | grep -v grep
+
+# 2. 找出卡住的 gh api graphql 子进程
+ps -eo pid,ppid,etime,stat,command | grep 'gh api graphql' | grep -v grep
+
+# 3. 只杀掉那个长时间不退出的 gh 进程
+kill -9 <stuck-gh-pid>
+
+# 4. 验证 web/API 是否恢复，而 next-server PID 是否保持不变
+curl -I http://localhost:3000
+ps -eo pid,etime,command | grep -E 'next-server|node .*next' | grep -v grep
+```
+
+如果第 1 步里还能看到 Next.js 进程，就**不要**把它当成首要处置对象。正确顺序是：先清掉卡住的 `gh api graphql`，再回头验证 `http://localhost:3000` 是否恢复响应。本次故障里，这样处理后 AO web/API 就恢复了，不需要重启 Next.js 服务。
+
+如果你同时看到多个 `gh api graphql`，优先处理那个 `etime` 已经明显异常、且与当前卡住请求对应的进程。不要无差别把所有 node/next 相关进程一起杀掉，否则会把原本健康的服务也打断。
+
+### 预防
+
+1. 看到 dashboard 或 API 卡住时，第一步先查 `gh api graphql`，不要条件反射先 `kill` Next.js。
+2. 诊断时把"服务进程是否还活着"和"服务内部是否有阻塞子进程"分开看，不要把两者混成一个问题。
+3. 运维值守时保留一条现成命令：`ps -eo pid,ppid,etime,stat,command | grep 'gh api graphql' | grep -v grep`，能比盲目重启更快定位真因。
+4. 只有在确认 next-server 自己已经退出、崩溃，或杀掉卡住的 `gh api graphql` 后仍然完全无响应时，才继续排查 Next.js 本身。
+
 ## 误诊链路（历史记录）
 
 Issue 11 的 tmux segfault 是整个安装过程最难排查的一个坑，最终耗掉了几个小时。以下是在确认真因之前，这次会话曾经认真尝试过、但最终证明并非根因的假设，按时间顺序记录，目的是让下一个遇到同类症状的人**不要重复走这些弯路**。
@@ -593,7 +638,7 @@ Issue 11 的 tmux segfault 是整个安装过程最难排查的一个坑，最�
 
 6. **假设："CEO 直接 batch-spawn 绕开 orchestrator 就能跑通"。** 结果：绕开 orchestrator 之后，worker 一样在 20 秒内死光。这一步反而证明了问题不在 orchestrator 层，而在更底层的 tmux。这是本次诊断的关键转折点。**结论**：当 worker 和 orchestrator 同时出问题时，**永远先查它们的共同依赖**（tmux / WSL / 内核）。
 
-7. **Issue 12 的 worktree 冲突**。在真因被找到之前，worktree 冲突让一部分 session 快速 exit 出一个 git 错误。我们把它误认成 Issue 11 的变种，花了一些时间在上面。最后证明它只是同时出现的另一个独立 bug，修掉之后 session 的存活时间指标并没有改善。**结论**：多 bug 共存时，要能把"每一条死因"逐项划勾。
+7. **Issue 12 的 worktree 冲突**。在真因被找到之前，worktree 冲突让一部分 session 快速 exit 出一个 Git 错误。我们把它误认成 Issue 11 的变种，花了一些时间在上面。最后证明它只是同时出现的另一个独立 bug，修掉之后 session 的存活时间指标并没有改善。**结论**：多 bug 共存时，要能把"每一条死因"逐项划勾。
 
 最后定位到 tmux 3.2a segfault 的线索，是一次对 `dmesg` 的例行检查。**这个教训被提炼成 Issue 11 的预防条目**：任何"session 无故死"的诊断流程，第一步都必须先看 dmesg。
 
@@ -664,7 +709,7 @@ sed -n '1,80p' /root/.config/gh/hosts.yml
 ```
 
 排查时只看 host、user、oauth_token 是否有条目即可，不要把 token 内容复制到聊天、工单或日志系统里。
-如果文件存在但 git 仍然 401，再回头检查是否漏了 `gh auth setup-git`。
+如果文件存在但 Git 仍然 401，再回头检查是否漏了 `gh auth setup-git`。
 
 ### 5. 网络类故障不要只用 `curl`，要复现真实工作负载
 
@@ -673,10 +718,10 @@ sed -n '1,80p' /root/.config/gh/hosts.yml
 所以网络排查最好分三层做。
 
 - 先用 `curl https://api.github.com` 验证最基本的出站连通性。
-- 再用 `git ls-remote origin` 验证 git 的 HTTP 路径。
+- 再用 `git ls-remote origin` 验证 Git 的 HTTP 路径。
 - 最后用一次真实 `git push` 或最小可复现写入请求验证长连接上传。
 
-必要时可以临时打开 git 的详细日志。
+必要时可以临时打开 Git 的详细日志。
 
 ```bash
 GIT_TRACE_CURL=1 GIT_CURL_VERBOSE=1 git push
