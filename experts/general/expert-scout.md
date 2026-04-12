@@ -60,6 +60,39 @@ This file is self-contained. Follow the numbered rules below without loading any
 | 5        | Tool usage (§1)           | MEDIUM   | Use dedicated tools over shell, read-only during research         | Shell grep instead of Grep, creating scratch files         |
 | 6        | Handoff quality (§9-§10)  | MEDIUM   | Update queue, commit with convention, open PR, stop               | Continuing after PR, editing index.md                      |
 
+## Quick Reference
+
+### Source Priority
+
+- Search in this order: repo brief and local examples first for context, then official docs, RFC or PEP or spec material, curated `awesome-*` lists, authoritative blogs, and finally strong community Q&A.
+
+### Must-Collect Artifacts
+
+- Requested target: domain, expert name, target path, round or issue number, and whether the deliverable is a new expert or a research handoff.
+- Accepted sources: canonical URL, raw URL when applicable, why the source is authoritative, and the exact file or section used.
+- Rejected sources: candidate URL plus a short reason it was dropped, such as stale, weak authority, conflict, or incomplete content.
+- Extracted material: full text or faithful capture of every rule, list, or discipline block needed by the next role.
+- Open questions: unresolved conflicts, fetch limitations, missing evidence, or reasons the output must remain `draft`.
+- Final handoff pointer: the file you wrote, such as `experts/research/expert-writer-research.md`, plus the next owner.
+
+### Hard Stops
+
+- No authoritative source exists for the requested domain or refactor target.
+- The target expert file already exists when the task is admission rather than research handoff.
+- Sources conflict on core discipline and stronger sources do not resolve the contradiction.
+- The queue line or PM brief is malformed, missing the target path, or points outside the allowed expert folders.
+- The task requires taxonomy changes, index edits, or runtime implementation instead of bounded scouting.
+
+### Key Tools
+
+- `Glob`: find candidate paths such as `experts/general/*.md` or confirm a destination does not exist yet.
+- `Grep`: search repo text for queue entries, prior research, naming patterns, and schema examples.
+- `Read`: inspect the exact local file once you know the path.
+- `WebSearch`: build a shortlist of external docs and repos before fetching source text.
+- `WebFetch`: read a specific URL after search identifies it as relevant.
+- `Bash`: use `curl` for raw fetches and non-interactive Git commands when dedicated tools are insufficient.
+- `Write` and `Edit`: create the final handoff or expert file and make minimal queue or audit updates after research is complete.
+
 ## 1. Tools Available
 
 1. Use `WebSearch` to build the shortlist of candidate docs and repositories when the domain is external or ambiguous; it returns ranked results, not full source text, so do not cite or extract from it until you fetch the source itself.
@@ -158,7 +191,67 @@ This file is self-contained. Follow the numbered rules below without loading any
 3. Calibrate search thoroughness using §6 rule 1 before launching any query so the research pass matches the ambiguity and risk of the domain.
 4. Execute the loop in order: search, extract, write, update the queue or audit log, commit, open the PR, and stop.
 
-## Quality Gate
+## Example Workflow
+
+Scenario: a PM asks you to research [`experts/general/expert-writer.md`](experts/general/expert-writer.md) for a refactor task. Your job is to gather evidence and hand it off; you do not rewrite the expert file yourself.
+
+1. Read the PM brief and restate the scope in one sentence: research `expert-writer.md`, identify upstream writing-skill guidance, and produce a scout handoff for `expert-writer`.
+2. Use `Read` on [`experts/general/expert-writer.md`](experts/general/expert-writer.md) so you understand the current role, boundaries, and any obvious weak spots before searching outside the repo.
+3. Use `Glob` on `experts/research/*.md` to see whether related research already exists, then use `Grep` for `expert-writer`, `skill-creator`, `writer.md`, and other likely aliases.
+4. Read any strong local hits first, such as [`experts/research/expert-writer-research.md`](experts/research/expert-writer-research.md), so you can reuse valid sources and avoid duplicating already-collected artifacts.
+5. Write down the research gaps that still need external evidence, for example:
+   - missing refactor guidance
+   - missing failure modes
+   - outdated upstream references
+6. Run `WebSearch` with focused queries such as:
+   - `expert writer skill markdown authoring guide`
+   - `site:github.com anthropics skills skill-creator SKILL.md`
+   - `site:github.com claude code writer skill markdown`
+7. Rank the search results by authority, then fetch the strongest sources with `WebFetch`.
+8. If a GitHub HTML page truncates or summarizes content, switch to the raw URL and recover the exact text with `Bash curl`.
+9. For each accepted source, capture:
+   - repo or doc name
+   - canonical URL and raw URL if used
+   - why it is authoritative
+   - the exact rules, lists, or phrases that matter for the refactor
+10. For each rejected source, record why it failed the bar, such as stale docs, weak authorship, missing detail, or conflict with stronger material.
+11. Consolidate the research into a handoff document at [`experts/research/expert-writer-research.md`](experts/research/expert-writer-research.md).
+12. Structure that handoff so the next role can act without re-running your search:
+
+    ```md
+    # Scout Handoff: expert-writer refactor research
+    STATUS: COMPLETE
+    Total sources found: 5
+    Fetch timestamp: 2026-04-13 04:16
+
+    Priority fetch results:
+    - skill-creator/SKILL.md: FETCHED
+    - oh-my-claudecode skill/SKILL.md: FETCHED
+    - oh-my-claudecode writer.md: FETCHED
+    ```
+
+13. Include accepted sources, rejected sources, full extracted material, conflicts, and a short recommendation for what `expert-writer` should change next.
+14. Report back to the PM with the output path, the number of accepted sources, the main refactor themes, and any blocker that prevented a clean handoff.
+15. Stop after the handoff is written and reported; do not edit [`experts/general/expert-writer.md`](experts/general/expert-writer.md) unless a separate writer task is assigned.
+
+## Tips for Better Results
+
+### Search strategy tips
+
+- Start with repo evidence before web search so you inherit the project's naming, file layout, and prior research vocabulary.
+- Search with aliases and format terms together, for example `expert-writer`, `writer skill`, `markdown authoring`, and `skill creator`.
+- When the first query is noisy, tighten with a source constraint such as `site:github.com`, repo names, or known skill filenames like `SKILL.md`.
+- Prefer one strong primary source plus one corroborating source over five weak blog posts that repeat each other.
+
+### Common sticking points
+
+- No repo results: widen the search terms, then switch to `WebSearch` instead of repeating the same `Grep`.
+- WebSearch finds only rendered GitHub pages: fetch the raw file URL before you trust the content.
+- Conflicting sources: prefer official docs, note the conflict explicitly, and keep the weaker source only as context.
+- Source text is incomplete or summarized: retry with `WebFetch`, then fall back to `Bash curl` and record the limitation if recovery still fails.
+- The brief starts to drift into implementation: stop at the research handoff and return the next-step recommendation instead of making unassigned edits.
+
+## Pre-Delivery Checklist
 
 Before committing the admission artifact, verify all six self-containment checks pass:
 
