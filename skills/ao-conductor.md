@@ -16,6 +16,60 @@ type: skill
 你必须先验证环境，再选择 Mode A、Mode B 或 Mode C，
 并且在行动前明确告诉用户你的模式判断和理由。
 
+## Truth Source
+
+本 skill 的权威顺序从高到低如下：
+
+1. 本文件：CEO 的主协议、Mode 判断、dispatch / review / iteration 主流程。
+2. `skills/references/pm-pool.md`：PM pool bring-up、slot 选择、容量与冲突阻断。
+3. `skills/references/silent-failure-detection.md`：dispatch 后 10 秒验证、present/past signal 区分、自愈边界。
+4. `skills/references/quality-feedback-loop.md`：quality incident、root-cause 层次判断、`skill-optimizer` 触发条件。
+
+如果 live 做法和 checked-in 文本冲突，先以 checked-in truth source 为准；
+只有当你已经拿到新的显式 authority，才允许更新 doctrine，而不是靠口头习惯继续漂移。
+
+## When to Apply
+
+这个 skill 用来判断 Claude 何时应该扮演 CEO，通过 AO 做调度、路由、审阅和质量闭环，而不是自己直接埋头实现。
+
+### Must Use
+
+- 用户明确要求“派活”“并行开发”“让 Codex 干”“ao batch”“ao send”“开 worker”“总经理调度”。
+- 任务需要 CEO 做 Mode A/B/C 判断、PM slot 选择、issue/brief 组织、session 监控或 PR 审阅。
+- 当前工作已经进入多 session / 多 PR / 多 review thread 协调，不再是单文件直改。
+- 你需要判断是否启用 PM pool，或需要把独立工作流路由到不同 PM 槽。
+
+### Recommended
+
+- 任务规模介于直改和并行 dispatch 之间，需要先判断是 Mode A 还是 Mode B。
+- 用户只给了模糊的“帮我安排一下”或“把这些任务分出去”，需要先做拆分和边界澄清。
+- 同类质量问题反复出现，需要结合 `quality-feedback-loop` 判断是否触发 `skill-optimizer`。
+- 你要接手已有 AO 链路的监控、review、CI 跟进或 PM handoff。
+
+### Skip
+
+- 单文件、小范围、预计 15 分钟内完成的 Mode A 任务。
+- 纯解释、纯问答、一次性交互式调试，不值得建立 AO 链路。
+- 当前目录不是 Git repo、没有 `agent-orchestrator.yaml`、没有可运行 orchestrator，且用户也没同意先补环境。
+- 你当前已经是被 dispatch 出来的 worker，任务目标是直接交付，不是再做二次调度。
+
+**Decision criteria**: 如果任务会改变谁来执行、如何拆分、派给哪个 PM / worker、如何验证 dispatch 成功、或如何闭环 review/CI，就用这个 skill；如果任务只是立刻做一个小改动或给出即时解释，就跳过。
+
+## Rule Categories by Priority
+
+按优先级 `1 -> 8` 依次判断，不要跳到后面的执行细节再回头补前置治理。
+
+| Priority | Category                            | Impact   | Key Checks                                                                                                                                | Antipatterns                                                                                                                                |
+| -------- | ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1        | Truth Source + Environment Bring-Up | Critical | 先读本文件与 `skills/references/*.md`；确认 `Ubuntu-22.04`、`ao`、`codex`、`agent-orchestrator.yaml`、running orchestrator 都存在         | 凭印象假设 AO 已可用，跳过现场检查                                                                                                          |
+| 2        | Mode Selection                      | Critical | 先声明 Mode A / B / C；判断任务规模、文件数量、依赖关系、brief 自包含程度                                                                 | 小任务强行 dispatch，或把高耦合任务假装可并行                                                                                               |
+| 3        | PM Pool Routing                     | Critical | 每个独立工作流分配独立 PM slot；独立性的最低判定是目标输出文件完全不重叠；优先选健康、可观察、空闲的 slot                                 | 把不相关任务叠加到同一繁忙 PM because 上下文膨胀导致任务干扰和执行精度下降；不使用 PM 池槽 because 单 PM 吞吐有限，独立工作流需要独立上下文 |
+| 4        | Pre-Delivery Send Discipline        | Critical | `ao send` 前先确认目标是自然语言协调消息、目标 PM 正确、PM context 未过载、WSL 正常；发送后 10 秒内做 dashboard + pane + `ao status` 验证 | `ao send` 前不做 10 秒验证 because 无法确认消息是否被接收；把 `message sent` 当成已派发成功                                                 |
+| 5        | Brief + Issue Quality               | High     | Mode C brief 必须 self-contained；写清目标文件、事实、Do/Don't、输出约束；issue 与 brief slug 一一对应                                    | 写“参考上文”“按项目现状自行理解”“其余同前文”                                                                                                |
+| 6        | Spawn + Self-Heal                   | High     | 带代理 spawn / send；每次 fan-out 后确认可观察产物；self-heal 有上限且只基于 canonical item                                               | 把隐式 backlog、memo 或 state file 当成合法待办来源                                                                                         |
+| 7        | Monitoring + Review + Iteration     | High     | `ao status` 持续巡检；review 要总结文件、规模、brief 符合度、风险；反馈必须可执行                                                         | CEO 派完就消失，或 review 只给“看起来不错”                                                                                                  |
+| 8        | Quality Feedback Loop               | Medium   | 记录 incident；区分 result / artifact / process / doctrine 四层；只 patch 最深的已证实根因                                                | 只在聊天里口头总结，不把系统性缺口沉淀成 doctrine / reference / expert 更新                                                                 |
+
 ## 1. 上下文检查
 
 skill 激活后的第一件事永远是环境检查。
@@ -110,7 +164,7 @@ ao batch-spawn
 dispatch 之后必须做 state-check，而不是把“message sent”当成功。
 最低要求如下，完整协议见 `references/silent-failure-detection.md`：
 
-- 每次 `ao send` / `ao batch-spawn` 后约 10 秒复核一次；先看 dashboard，再用 `ao status` / GitHub 交叉核对
+- 每次 `ao send` / `ao batch-spawn` 后约 10 秒复核一次；先看 dashboard，再 `tmux capture-pane` peek 一眼目标 pane，最后用 `ao status` / GitHub 交叉核对 present signal
 - 必须区分 present signal 和 past signal；`Worked for ...` 只代表上一个 turn 结束，不代表仍在进行
 - dashboard 可见状态是权威；tmux、pstree、raw API 只能用于诊断，不能作为“其实已经在跑”的证据
 - 若 dispatch 未被验证成功，就立刻 self-heal：补发、补 Enter、重新验证；只有在真实错误、真实交付或需要新决策时才向用户升级
@@ -121,6 +175,30 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 
 本节的读者是已经加载 `ao-conductor` skill 的 CEO。你的当前任务是稳定地把 brief 发给 worker 或 PM，而不是和 shell quoting 较劲。
 先直接按下面两步做，不要先退回 inline `ao send`。示例里的路径一律使用 WSL 原生路径，命令块按这个结构复制最稳。
+
+### 3.1 PM Pool dispatch 规则
+
+在进入 `ao send` 之前，先按 `skills/references/pm-pool.md` 选 PM，而不是按“哪个 session 最近回过你”来派。
+
+- 每个独立工作流都应该占用独立 PM 槽。最低独立性判定：工作流 A 和 B 的目标输出文件完全不重叠。
+- 如果两个任务共享目标文件、共享同一个 canonical item、或 review / CI / follow-up 必须沿同一 ownership 链返回，就不要拆到不同 PM。
+- 默认纪律仍然是一个 PM slot 只持有一条 active dispatch chain。只有在边界已书面化、并且两个链路都已有 state summary 时，才允许同一 PM 暂时持有第二个不相关 workflow。
+- 同一 PM 不得同时持有超过 2 个不相关工作流的 context；如果没有合适的 idle slot，就排队、drain、或 scale up，不要继续往繁忙 PM 堆任务。
+- 只有健康、可观察、身份稳定的 slot 才能接任务。`unknown`、`offline`、dashboard/status 对不上的 PM 都视为不可派发。
+- 新 assignment 只有在 10 秒验证后出现可观察 activity，才算真正进入 `assigned`。
+
+### 3.2 Pre-Delivery Checklist
+
+每次给 PM 发 `ao send` 前都必须逐条确认：
+
+- 目标消息是自然语言协调指令，不是直接把 worker 用的结构化 brief 生硬塞给 PM。
+- 目标 PM 是正确的槽；不相关工作流应去不同 slot，而不是都压到默认 PM。
+- 当前 PM context 没有过载：从最近一次 handoff / summary 算起未超过 1 小时，且当前承载批次数少于 10。
+- WSL 仍在运行，`ao status` 可见目标 PM，发送链路没有失联。
+- 消息若稍长、多行、或包含引号陷阱，优先使用本节的两步稳定模式，不要贪图 inline 快捷。
+- 发送后 10 秒内必须完成验证：先看 dashboard，再 peek pane，最后跑 `ao status` / GitHub，确认目标出现 `Working` 或其它 present signal。
+
+### 3.3 稳定发送两步法
 
 推荐固定走两步：
 
@@ -378,18 +456,21 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 4. 如果 `ao status` 仍然显示有 active sessions，就再设置一个 5 分钟后的 `ScheduleWakeup`，继续轮询。
 5. 如果 `ao status` 显示没有 active sessions，就停止轮询，不要续设新的 `ScheduleWakeup`。
 
-## 10. 何时不要使用这个 skill
+## 10. Antipatterns
 
-下面这些情况，你应该明确拒绝 dispatch，并说明为什么不适合 AO：
+下面这些动作必须直接拒绝、重路由或降级到更合适的模式。格式固定为“描述 — Refuse it because <理由>”。
 
-- 用户说“fix this one typo”。这是 Mode A，直接改，不要建 issue。
-- 用户说“explain what this function does”。这是解释任务，直接解释，不要开 worker。
-- 用户正在互动式调试。比如一边看日志一边追问题，AO 会打断节奏。
-- 当前目录不是 Git repo。AO 依赖 Git 工作流，没有仓库就不该进入派活流程。
-- 仓库没有配置 GitHub remote。`gh` 和 `batch-spawn` 都依赖明确的远程仓库上下文。
+- 把不相关任务叠加到同一繁忙 PM — Refuse it because 上下文膨胀导致任务干扰和执行精度下降。
+- 不使用 PM 池槽，明明存在独立工作流却继续全塞给默认 PM — Refuse it because 单 PM 吞吐有限，独立工作流需要独立上下文。
+- 把 `ao send` 当 fire-and-forget，不做 10 秒验证 — Refuse it because 无法确认消息是否被接收。
+- 用户说“fix this one typo”却仍然想走 AO dispatch — Refuse it because 这是 Mode A 直改任务，派活只会增加延迟和管理开销。
+- 用户说“explain what this function does”却想开 worker — Refuse it because 这是解释任务，直接解释比建立 AO 链路更快更准。
+- 用户正在互动式调试，还想同步开一串 worker — Refuse it because 调试依赖高频往返和即时观察，AO 会打断节奏并放大误判。
+- 当前目录不是 Git repo，却还要继续 issue / PR 工作流 — Refuse it because AO 依赖可审计的 Git 链路，没有仓库就没有稳定 ownership。
+- 仓库没有配置 GitHub remote，却还要创建 issue / batch-spawn — Refuse it because `gh`、PR、review、CI 都需要明确的远程仓库上下文。
 
-当你拒绝 dispatch 时，不要只说“不用这个 skill”。
-你要给用户一个替代动作，比如直接修、直接解释、或者先初始化 Git、remote、`agent-orchestrator.yaml` 再继续。
+当你拒绝这些 antipattern 时，不要只说“不用这个 skill”。
+你要立即给出替代动作：Mode A 直接处理、直接解释、继续现场调试，或者先初始化 Git / remote / `agent-orchestrator.yaml` 再回来。
 
 示例对话四：
 用户说：“解释一下这个函数干嘛的。”
@@ -402,7 +483,9 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 - Workers 只能看到 issue body，所以每一个相关事实都必须写进 issue body，不要假设 worker 能看到主对话、本地终端历史或你脑中的隐含背景。
 - `agent-orchestrator.yaml` 里的 `runtime` 必须设成 `tmux`，不是 `process`。
 - 从 WSL 调用 `ao start` 或 `ao send` 时，始终要导出或内联 `HTTPS_PROXY`，否则在常见网络环境下可能不稳定或直接失败。
+- 独立工作流优先分配到不同 PM slot；如果当前没有健康 idle slot，就先排队或扩槽，不要图省事把所有上下文堆给同一个 PM。
 - 同一个 PM 一旦接近 `85%` 上下文预算，要先 pause + state summary，再决定 handoff 或继续，不要硬塞下一批任务。
+- 同类质量问题重复出现时，要按 `quality-feedback-loop.md` 写 incident，并判断是否应该触发 `skill-optimizer`，不要只在聊天里口头复盘。
 - 用户执行完 `gh auth login` 之后，还要记得运行下面这个命令：
 
 ```bash
