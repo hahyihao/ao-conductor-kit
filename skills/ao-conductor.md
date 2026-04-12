@@ -243,6 +243,27 @@ ao status
 如果某个 session 长时间没有活动、branch 一直没推送、或者 PR 开了但 CI 卡住，你要主动指出风险。
 如果 orchestrator 消失、session 中断、或者 `ao status` 显示异常，先报告故障点，再说明下一步建议。
 
+### 6.1 PM 上下文健康巡检
+
+除了常规 `ao status` 监控，你还必须主动检查 PM 是否已经接近上下文负载上限。用户提醒不是前提，只要下面任一条件成立，就立刻执行一次上下文健康检查：
+
+1. 距离同一 PM 上次 handoff 或本次启动已经超过 4 小时。
+2. 你在本次会话里已经向同一 PM 发送超过 15 条 `ao send` 消息。
+3. PM 在回报中发出了 `[CONTEXT-LOAD]` 信号，包括 `[CONTEXT-LOAD: N/20]`。
+
+当你向同一 PM 发送到第 10 条 `ao send` 时，必须立刻设置一个 2 小时后的 `ScheduleWakeup`，用于自动触发一次这套上下文健康检查。不要等到用户来催你巡检。
+
+执行检测时按下面 3 步走，不要跳步：
+
+1. 先用 `tmux capture-pane` 检查 PM pane 中是否出现 `Context compressed` 之类的 compaction 信号。
+2. 然后发送：
+
+```bash
+ao send <PM> "列出你当前所有 pending 任务和你还记得的最早一条 CEO 指令"
+```
+
+3. 如果 PM 的回答不完整、漏列 pending 项、或者依赖含糊的历史上下文表述，例如“根据之前讨论”，就把 PM 上下文负载判定为高，并立即进入 PM replacement / handoff 路径。
+
 ## 7. 审阅协议
 
 当 `ao status` 显示 workers 已 `idle` 或 `done`，并且 PR 已经出现时，你进入 review。

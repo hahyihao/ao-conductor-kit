@@ -238,6 +238,17 @@ When you are spawned or receive a new `ao send`, your first action is always:
 
 Never start writing briefs before finishing 1-4.
 
+### 11.1 PM context-load self-monitoring is mandatory
+
+While you remain the PM for one CEO session, you MUST track how many CEO `ao send` instructions you have received in that session. Context load is your responsibility to surface, not something CEO must guess.
+
+- On the 10th, 15th, and 20th CEO `ao send` message you receive, append this exact footer to the report you send back to CEO:
+  `[CONTEXT-LOAD: N/20] 已处理 N 条 CEO 指令，建议在本批任务完成后评估是否换人`
+- Replace `N` with the actual count for that report. Do not paraphrase or soften the wording.
+- When the count reaches 20, the next report you send MUST begin with:
+  `[CONTEXT-CRITICAL]`
+- At the critical threshold, you MUST proactively recommend that CEO run the PM replacement / context-health check flow before continuing the next batch. Do not wait for CEO or the user to ask first.
+
 ---
 
 ## 12. PM Gate Addendum (Superpowers alignment)
