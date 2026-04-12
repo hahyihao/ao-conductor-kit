@@ -9,14 +9,14 @@
 
 > 本快照由 session `kit-78` 刷新，用来替换 2026-04-11 的旧状态叙述。
 
-| Round | 状态 | 当前快照 |
-|---|---|---|
-| Round 0 | ✅ 已完成 | `experts/` 基础库、`task-splitter.md`、索引与审计文件已落地，tag `v0.3.0-round-0` 仍是自举基线。 |
-| Round 1 | ✅ 已完成 | 5 个基础设施专家已进入 `main`：`architect`、`expert-scout`、`library-maintainer`、`env-ops`、`code-reviewer`。 |
-| Round 2 | ✅ 已完成 | 8 个通用专家已进入 `main`：`code-writer`、`script-writer`、`writer`、`test-engineer`、`debugger`、`security-auditor`、`refactorer`、`planner`。 |
-| Round 2.5 | ✅ 已完成 | 专家库增强波次已进入 `main`：`expert-writer`、`prompt-engineer`，以及 `experts/index.md` 刷新与库整理。 |
-| Round 3 | ✅ 已完成 | 按本次用户指令记为完成：10 个项目专家包装任务已在 `feat/37`-`feat/46` 产出实现分支与 PR，规划基线见 `docs/round-3-plan.md`。这表示本轮交付已完成；合并回 `main` 仍由后续整合任务跟进。 |
-| Round 4+ | ⏸ 待启动 | 运行时自增长、自动发现、周期性库维护仍未闭环，等 Round 3 主线整合后继续。 |
+| Round     | 状态      | 当前快照                                                                                                                                                                               |
+| --------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Round 0   | ✅ 已完成 | `experts/` 基础库、`task-splitter.md`、索引与审计文件已落地，tag `v0.3.0-round-0` 仍是自举基线。                                                                                       |
+| Round 1   | ✅ 已完成 | 5 个基础设施专家已进入 `main`：`architect`、`expert-scout`、`library-maintainer`、`env-ops`、`code-reviewer`。                                                                         |
+| Round 2   | ✅ 已完成 | 8 个通用专家已进入 `main`：`code-writer`、`script-writer`、`writer`、`test-engineer`、`debugger`、`security-auditor`、`refactorer`、`planner`。                                        |
+| Round 2.5 | ✅ 已完成 | 专家库增强波次已进入 `main`：`expert-writer`、`prompt-engineer`，以及 `experts/index.md` 刷新与库整理。                                                                                |
+| Round 3   | ✅ 已完成 | 按本次用户指令记为完成：10 个项目专家包装任务已在 `feat/37`-`feat/46` 产出实现分支与 PR，规划基线见 `docs/round-3-plan.md`。这表示本轮交付已完成；合并回 `main` 仍由后续整合任务跟进。 |
+| Round 4+  | ⏸ 待启动 | 运行时自增长、自动发现、周期性库维护仍未闭环，等 Round 3 主线整合后继续。                                                                                                              |
 
 ### 本次会话主要产出
 
