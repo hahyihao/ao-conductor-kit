@@ -111,9 +111,9 @@ Every auto-review returns exactly this report:
 
 ### Blocking Items
 
-| Priority | File:Line or Artifact | Problem | Required fix |
-|---|---|---|---|
-| HIGH | experts/general/foo.md:27 | Missing required frontmatter field | Add the field and rerun review |
+| Priority | File:Line or Artifact     | Problem                            | Required fix                   |
+| -------- | ------------------------- | ---------------------------------- | ------------------------------ |
+| HIGH     | experts/general/foo.md:27 | Missing required frontmatter field | Add the field and rerun review |
 
 ### Notes
 
