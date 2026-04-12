@@ -322,6 +322,24 @@ gh pr diff <pr-number>
 如果是 review comment，尽量保持一句问题对应一条 comment，方便 worker 精准响应。
 如果是 follow-up issue，重新遵守第 3 节的 self-contained brief 规则，不要偷懒复用不完整上下文。
 
+### 8.1 ScheduleWakeup 自动监控规则
+
+只要本轮有一次 `ao send` 成功发出，你就要立即调用：
+
+```text
+ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
+```
+
+同一轮次里如果已经设置过这一个 `ScheduleWakeup`，就不要重复设置，避免堆叠出多个内容相同的轮询唤醒。
+
+当你被这个 `ScheduleWakeup` 唤醒后，按固定顺序执行：
+
+1. 先运行 `ao status`，确认当前是否还有 active sessions。
+2. 再读取 `/root/ao-inbox/events.jsonl` 的最新事件，检查是否有任务完成、PR 更新或新的失败信号。
+3. 如果有已完成任务，先处理这些结果，再判断是否还需要继续监控。
+4. 如果 `ao status` 仍然显示有 active sessions，就再设置一个 5 分钟后的 `ScheduleWakeup`，继续轮询。
+5. 如果 `ao status` 显示没有 active sessions，就停止轮询，不要续设新的 `ScheduleWakeup`。
+
 ## 9. 何时不要使用这个 skill
 
 下面这些情况，你应该明确拒绝 dispatch，并说明为什么不适合 AO：
