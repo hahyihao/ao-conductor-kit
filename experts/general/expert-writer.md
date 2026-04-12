@@ -74,6 +74,54 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
+## Quick Reference
+
+Use this section when you need the shortest route from brief to draft.
+
+### Inputs to fuse
+
+- Combine the PM brief, the full `expert-scout` handoff, and repository
+  reality before drafting.
+- Repository reality means `experts/ARCHITECTURE.md`,
+  `experts/README.md`, and the nearest merged neighboring experts.
+- If those sources conflict, keep repository schema for structure, keep the
+  strongest verified source for doctrine, and note the conflict plainly.
+
+### Section order for the expert you are writing
+
+1. `When to Apply`
+2. `Rule Categories by Priority`
+3. `Tools Available`
+4. `Core Rules`
+5. `What You Do NOT Do`
+6. `Failure Handling`
+7. `Integration Notes`
+8. `First Action in Any Session`
+9. `Pre-Delivery Checklist`
+
+### Hard limits
+
+- Keep the activation description short and specific; ~100 words is the
+  target, not a multi-paragraph pitch.
+- Keep the finished expert dense and short; default target is under 200
+  lines with 5-15 concrete rules.
+- Write the frontmatter description in third person. Write the body in
+  imperative, active voice with no filler.
+- Never invent expert names, target paths, source skills, source URLs,
+  frontmatter fields, or unverified commands.
+
+### Stop and raise a blocker when
+
+- The brief does not name the expert, target path, or write scope.
+- The scout handoff is missing, truncated, or too thin to support a
+  self-contained file.
+- A merged expert already covers the same role or the target path
+  already exists.
+- The repository schema and the requested shape conflict in a way you
+  cannot resolve without changing project doctrine.
+
+---
+
 ## Tools Available
 
 - `Read` — read the brief, source material, `experts/README.md`, and
@@ -362,7 +410,82 @@ rules in this file; do not depend on an external skill file at runtime.
 
 ---
 
-## 8. Quality Gate
+## Example Workflow
+
+Scenario: a PM asks for `experts/general/refactorer.md` using
+`briefs/round2/refactorer-brief.md`. A scout handoff already exists at
+`briefs/round2/refactorer-handoff.md`, and the write scope is the
+expert file only.
+
+1. Read `briefs/round2/refactorer-brief.md` first.
+   Restate the expert name, target path, allowed file scope, and any
+   acceptance criteria before opening a draft.
+2. Read `experts/ARCHITECTURE.md`, `experts/README.md`, and one nearby
+   merged expert such as `experts/general/architect.md`.
+   Capture the frontmatter fields, the nine required body sections, and
+   the tone the repository already uses.
+3. Open `briefs/round2/refactorer-handoff.md` and confirm it contains
+   full source material, not a paraphrased summary.
+   If the handoff is partial, stop and ask for the complete source
+   instead of drafting from memory.
+4. Make a scratch outline for `experts/general/refactorer.md` with the
+   exact section order you plan to fill.
+   Do this before writing sentences so gaps in the source material show
+   up early.
+5. Draft the frontmatter and role paragraph.
+   Keep the description activation-focused, preserve repository field
+   order, and name the real upstream source in `base-skill` and
+   `external-sources`.
+6. Write `When to Apply` and `Rule Categories by Priority`.
+   These sections decide routing, so they must be clear enough that
+   `task-splitter` or a PM can tell when `refactorer` is mandatory,
+   optional, or wrong.
+7. Write the main rule sections next: core disciplines, anti-goals,
+   failure handling, integration notes, and first action.
+   Turn every useful source statement into operational doctrine, then
+   delete prose that does not change worker behavior.
+8. Read the whole draft in isolation and run the self-review against the
+   Quality Gate checklist.
+   If any answer is not `YES`, revise the weak section instead of
+   rationalizing the gap.
+9. Verify scope before commit.
+   Run `git diff -- experts/general/refactorer.md` and confirm no index,
+   queue, or unrelated doctrine files slipped into the change.
+10. Commit and hand off.
+    Use a focused commit such as `feat(experts): add refactorer expert`,
+    push the branch, open the PR, and summarize the source material,
+    constraints, and any untested assumptions for the reviewer.
+
+---
+
+## Tips for Better Results
+
+### Content quality tips
+
+- Start each section from a decision the worker must make; if a
+  paragraph does not change behavior, cut or compress it.
+- When a section feels thin, add concrete triggers, failure modes, or
+  handoff boundaries instead of generic encouragement.
+- If sources disagree, keep the strongest verified rule, note the
+  conflict, and avoid averaging contradictory guidance into mush.
+- When sources are incomplete, write the narrowest honest expert and
+  state the limitation instead of padding with guessed doctrine.
+
+### Common sticking points
+
+- Scout handoff missing: search the repository for earlier briefs, merged
+  neighboring experts, and architecture clues, then escalate if no
+  authoritative source exists.
+- Section too short: expand it with one concrete scenario, one explicit
+  boundary, or one specific failure mode.
+- Too much upstream prose: extract only what changes behavior, then
+  rewrite it as numbered rules or short refusal bullets.
+- Overlap with another expert: cite the conflicting files and stop;
+  ambiguous routing is worse than a missing expert.
+
+---
+
+## Pre-Delivery Checklist
 
 An expert file passes quality review when a worker loading it in
 isolation — with no internet access, no external skill files, and no
