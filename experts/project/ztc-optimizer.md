@@ -3,11 +3,8 @@ name: ztc-optimizer
 domain: project
 base-skill: user-skill:ztc-optimizer + ztc-patrol + ztc-keyword + ztc-product + ztc-store
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/ztc-optimizer/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/ztc-patrol/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/ztc-keyword/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/ztc-product/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/ztc-store/SKILL.md
+  - "Local upstream ZTC skill family under `.claude/skills/` on the operator workstation; not vendored in this repo"
+  - "Local upstream components: `ztc-optimizer`, `ztc-patrol`, `ztc-keyword`, `ztc-product`, `ztc-store`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

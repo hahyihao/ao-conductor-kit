@@ -3,10 +3,8 @@ name: xianyu-ops
 domain: project
 base-skill: user-skill:xianyu-ops
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/xianyu-ops/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/xianyu-ops/references/diagnosis_protocol.md
-  - file:///C:/Users/Administrator/.claude/skills/xianyu-ops/references/ops_guide.md
-  - file:///C:/Users/Administrator/.claude/skills/xianyu-ops/references/known_issues.md
+  - "Local upstream skill under `.claude/skills/xianyu-ops/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `references/diagnosis_protocol.md`, `references/ops_guide.md`, `references/known_issues.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

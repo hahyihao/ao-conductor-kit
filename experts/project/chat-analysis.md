@@ -3,10 +3,8 @@ name: chat-analysis
 domain: project
 base-skill: user-skill:chat-analysis
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/chat-analysis/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/chat-analysis/task_prompts.md
-  - file:///C:/Users/Administrator/.claude/skills/chat-analysis/references/dimensions.md
-  - file:///C:/Users/Administrator/.claude/skills/chat-analysis/references/pitfalls.md
+  - "Local upstream skill under `.claude/skills/chat-analysis/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `task_prompts.md`, `references/dimensions.md`, `references/pitfalls.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

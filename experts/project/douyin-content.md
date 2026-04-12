@@ -3,15 +3,8 @@ name: douyin-content
 domain: project
 base-skill: user-skill:douyin-content family
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/douyin-shared-rules/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-content-creation/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-content-review/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-content-layout/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-layout-review/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-background-asset/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-tts-voice/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-video-compose/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/douyin-video-review/SKILL.md
+  - "Local upstream Douyin skill family under `.claude/skills/` on the operator workstation; not vendored in this repo"
+  - "Local upstream components: `douyin-shared-rules`, `douyin-content-creation`, `douyin-content-review`, `douyin-content-layout`, `douyin-layout-review`, `douyin-background-asset`, `douyin-tts-voice`, `douyin-video-compose`, `douyin-video-review`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

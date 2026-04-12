@@ -3,11 +3,8 @@ name: novel-reader
 domain: project
 base-skill: user-skill:novel-reader-review
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/novel-reader-review/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/novel-reader-review/references/review-workflow.md
-  - file:///C:/Users/Administrator/.claude/skills/novel-reader-review/references/scoring-dimensions.md
-  - file:///C:/Users/Administrator/.claude/skills/novel-reader-review/references/ai-detection.md
-  - file:///C:/Users/Administrator/.claude/skills/novel-reader-review/references/report-template.md
+  - "Local upstream skill under `.claude/skills/novel-reader-review/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `review-workflow.md`, `scoring-dimensions.md`, `ai-detection.md`, `report-template.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

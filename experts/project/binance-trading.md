@@ -3,12 +3,8 @@ name: binance-trading
 domain: project
 base-skill: user-skill:binance-trading-ops
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/references/operations-guide.md
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/references/log-format.md
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/references/params-reference.md
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/references/phone-control.md
-  - file:///C:/Users/Administrator/.claude/skills/binance-trading-ops/references/architecture.md
+  - "Local upstream skill family under `.claude/skills/binance-trading-ops/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `operations-guide.md`, `log-format.md`, `params-reference.md`, `phone-control.md`, `architecture.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter
