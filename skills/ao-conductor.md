@@ -108,7 +108,7 @@ ao batch-spawn
 ### 2.3 状态巡检与自愈摘要
 
 dispatch 之后必须做 state-check，而不是把“message sent”当成功。
-最低要求如下，完整协议见 `skills/references/silent-failure-detection.md`：
+最低要求如下，完整协议见 `references/silent-failure-detection.md`：
 
 - 每次 `ao send` / `ao batch-spawn` 后约 10 秒复核一次；先看 dashboard，再用 `ao status` / GitHub 交叉核对
 - 必须区分 present signal 和 past signal；`Worked for ...` 只代表上一个 turn 结束，不代表仍在进行
