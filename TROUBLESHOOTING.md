@@ -698,6 +698,11 @@ ao doctor
 `ao doctor` 适合在你怀疑环境缺依赖、代理、终端 runtime 或 GitHub 集成时做一次体检。
 先从全局状态确认故障范围，再决定是去看某个 worker 的日志、tmux pane，还是网络链路。
 
+补一个容易误判的点：
+如果 `ao status` 里出现 `(unknown)`，不要把它直接解读成 session 健康或故障。
+它更像“需要继续核实”的提示，
+必须再用 dashboard、session activity、PR/CI 状态，或 `ao session ls -a` / tmux 现场交叉确认。
+
 ### 4. GitHub 认证问题优先看 `/root/.config/gh/hosts.yml`
 
 GitHub CLI 的认证落点在 `/root/.config/gh/hosts.yml`。
