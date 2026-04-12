@@ -145,14 +145,14 @@ agent-orchestrator/
 
 ## 核心文档索引
 
-| 你想做什么 | 看哪个文档 |
-|---|---|
-| 从零装一遍 | [INSTALL.md](INSTALL.md) |
-| 理解 Claude/Codex 分工逻辑 | [FLOW.md](FLOW.md) |
-| 遇到报错 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) |
-| 让 Claude 自动变总经理 | [skills/ao-conductor.md](skills/ao-conductor.md) |
-| 写新任务的 brief | [briefs/](briefs/) 目录里任选一份参考 |
-| 新项目 AO 配置 | [templates/agent-orchestrator.yaml](templates/agent-orchestrator.yaml) |
+| 你想做什么                 | 看哪个文档                                                             |
+| -------------------------- | ---------------------------------------------------------------------- |
+| 从零装一遍                 | [INSTALL.md](INSTALL.md)                                               |
+| 理解 Claude/Codex 分工逻辑 | [FLOW.md](FLOW.md)                                                     |
+| 遇到报错                   | [TROUBLESHOOTING.md](TROUBLESHOOTING.md)                               |
+| 让 Claude 自动变总经理     | [skills/ao-conductor.md](skills/ao-conductor.md)                       |
+| 写新任务的 brief           | [briefs/](briefs/) 目录里任选一份参考                                  |
+| 新项目 AO 配置             | [templates/agent-orchestrator.yaml](templates/agent-orchestrator.yaml) |
 
 ---
 
@@ -165,9 +165,9 @@ agent-orchestrator/
 1. 用户提出"把今天的流程整理成可移植 init kit"
 2. 作为 CEO 的 Claude 把需求拆成 6 个独立子任务
 3. 为每个子任务写 brief（存于 `briefs/`）
-4. 创建 6 个 GitHub issue（`#9`-`#14`，在 repo `hahyihao/ao-test`）
+4. 创建 6 个 GitHub issue（`#9`-`#14`，在 repository `hahyihao/ao-test`）
 5. `ao batch-spawn 9 10 11 12 13 14` 派 6 路并行 worker
-6. 每个 worker 在独立 git worktree 里用 Codex (gpt-5.4) 写文件
+6. 每个 worker 在独立 Git worktree 里用 Codex (gpt-5.4) 写文件
 7. 每个 worker commit + push + 自动开 PR
 8. CEO 把 6 个 PR 的文件提取到母盘（`ci-staging/build-mother.sh`）
 9. CEO 补上 `README.md`（本文件）和 `templates/`
