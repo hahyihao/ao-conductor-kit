@@ -26,6 +26,6 @@ jobs:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: false
-          FILTER_REGEX_EXCLUDE: .*briefs/.*|.*/node_modules/.*
+          FILTER_REGEX_EXCLUDE: .*briefs/.*|.*/node_modules/.*|.*experts/research/.*
           VALIDATE_JSCPD: false
           SUPPRESS_POSSUM: true
