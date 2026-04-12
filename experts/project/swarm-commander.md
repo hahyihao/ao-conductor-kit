@@ -3,13 +3,8 @@ name: swarm-commander
 domain: project
 base-skill: user-skill:swarm-commander + pc-init
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/skill.md
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/references/precheck.md
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/references/stage-gates.md
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/references/result-handling.md
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/references/prompt-patterns.md
-  - file:///C:/Users/Administrator/.claude/skills/swarm-commander/references/recommendation.md
-  - file:///C:/Users/Administrator/.claude/skills/pc-init/SKILL.md
+  - "Local upstream skills under `.claude/skills/swarm-commander/` and `.claude/skills/pc-init/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `precheck.md`, `stage-gates.md`, `result-handling.md`, `prompt-patterns.md`, `recommendation.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

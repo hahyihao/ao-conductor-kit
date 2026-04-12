@@ -3,9 +3,8 @@ name: qq-bot-audit
 domain: project
 base-skill: user-skill:qq-bot-audit
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/qq-bot-audit/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/qq-bot-audit/references/fission-patterns.md
-  - file:///C:/Users/Administrator/.claude/skills/qq-bot-audit/references/regression-cases.md
+  - "Local upstream skill under `.claude/skills/qq-bot-audit/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `references/fission-patterns.md`, `references/regression-cases.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

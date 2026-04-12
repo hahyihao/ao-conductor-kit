@@ -3,13 +3,8 @@ name: tieba-operation
 domain: project
 base-skill: user-skill:tieba-operation-master
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/tieba-yanghao.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/tieba-yinliu.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/safety-rules.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/reply-generation-rules.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/monitoring-slo.md
-  - file:///C:/Users/Administrator/.claude/skills/tieba-operation-master/references/douyin-strategy.md
+  - "Local upstream skill under `.claude/skills/tieba-operation-master/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `tieba-yanghao.md`, `tieba-yinliu.md`, `safety-rules.md`, `reply-generation-rules.md`, `monitoring-slo.md`, `douyin-strategy.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter

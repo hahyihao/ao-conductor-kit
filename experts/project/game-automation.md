@@ -3,9 +3,8 @@ name: game-automation
 domain: project
 base-skill: user-skill:game-automation
 external-sources:
-  - file:///C:/Users/Administrator/.claude/skills/game-automation/SKILL.md
-  - file:///C:/Users/Administrator/.claude/skills/game-automation/references/yaml_spec.md
-  - file:///C:/Users/Administrator/.claude/skills/game-automation/references/troubleshooting.md
+  - "Local upstream skill under `.claude/skills/game-automation/` on the operator workstation; not vendored in this repo"
+  - "Local upstream references: `references/yaml_spec.md`, `references/troubleshooting.md`"
 project-extensions: []
 discovered-on: 2026-04-12
 discovered-by: task-splitter
