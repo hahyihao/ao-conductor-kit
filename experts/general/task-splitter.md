@@ -57,6 +57,8 @@ Each sub-task has a clear, observable acceptance condition. Examples:
 - "running `verify-install.sh` exits 0"
 - "`gh pr view <N>` shows mergeable=true and CI=green"
 
+Completion criteria for dispatched worker tasks MUST verify delivery state, not just local implementation state. If the intended output is a PR, the acceptance path MUST make it observable that `git commit`, `git push origin`, and `gh pr create` all completed. A worker with code committed locally or a branch pushed but no PR open is not done; if implementation is finished but handoff failed, the correct state is `working-but-output-stuck`.
+
 If you cannot state the acceptance condition in one sentence, the sub-task is too vague to dispatch.
 
 ### 2.4 Self-contained brief
@@ -110,6 +112,13 @@ Contents:
 One file per sub-task: `briefs/<slug>-<n>.md`
 
 Must follow the template chosen by task type. Must inject the expert content from `experts/` (inline, not by reference).
+
+Every worker brief MUST include a `Done Criteria / Output Verification` section, or an equivalently explicit heading, that requires proof of all three delivery steps:
+- `git commit` completed
+- `git push origin` completed
+- `gh pr create` completed
+
+If `gh pr create` fails for a transient reason, such as a GitHub GraphQL or rate-limit response, the brief MUST instruct the worker to retry using the approved path. If retry still fails, or the failure is not safely retryable, the worker MUST explicitly report `blocked` or `output-stuck` with the failing command, the error, and the last successful delivery step. The worker MUST NOT report the task as done until the PR exists.
 
 ### 4.3 GitHub issues
 One issue per brief, created with `gh issue create --body-file <brief>`. Record each issue number back into the plan document.
@@ -174,6 +183,7 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 ## 9. Failure handling
 
 - **Worker stalls (no git activity for > 10 min)**: `ao send <worker> "status?"`. If no response in 2 min, escalate to CEO.
+- **Worker finishes implementation but cannot complete delivery (`git commit`, `git push origin`, or `gh pr create`)**: classify the session as `working-but-output-stuck`, not complete. Require the worker to report the last successful delivery step, the failing command, the error output, and whether the failure looks transient (for example GitHub GraphQL / rate-limit) or hard-blocking. PM and CEO monitoring MUST distinguish this state from ordinary in-progress work and keep it open until the PR exists or the block is escalated.
 - **CI fails repeatedly (> 3 times on same PR)**: stop the self-heal loop, escalate to CEO with the error summary.
 - **Expert scout cannot find a source for a requested domain**: mark the discovery-queue entry as `blocked`, escalate to CEO with a human-readable explanation of what is needed.
 - **Architect produces conflicting ADRs**: escalate to CEO, do not pick one yourself.
@@ -214,6 +224,7 @@ Every worker brief MUST restate the goal in concrete task language and MUST decl
 - file anchors that name the exact files, directories, or bounded scope the worker may change
 - a do-not-touch list that names forbidden files, directories, and out-of-scope surfaces
 - an output contract that states the required delivery format
+- a done-criteria / output-verification section that defines the handoff completion gate
 - acceptance and verification requirements that define how completion will be checked
 
 If any item above is missing, the brief is incomplete and MUST NOT be dispatched.
@@ -251,10 +262,11 @@ Every worker handoff MUST include an evidence bundle. A delivery without evidenc
 - commands run
 - observed results
 - changed files
+- delivery-state proof for `git commit`, `git push origin`, and `gh pr create`, or an explicit `blocked` / `output-stuck` report that names the failed step and error
 - a verification mapping that ties each acceptance requirement to proof
 - remaining risks or follow-up concerns
 
-You MUST ask for this bundle in the brief and MUST treat missing evidence as a failed gate, even if the code diff looks plausible.
+You MUST ask for this bundle in the brief and MUST treat missing evidence as a failed gate, even if the code diff looks plausible. PM MUST use this delivery-state evidence to distinguish `working` / in-progress execution from `working-but-output-stuck` when implementation is complete but PR creation is blocked.
 
 ### 12.7 Re-review is mandatory after any substantive rework
 
