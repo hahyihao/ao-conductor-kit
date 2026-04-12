@@ -194,7 +194,7 @@ orchestrator 需要长期存在，
 
 Worker 是由 AO 按 issue 生成的 Codex CLI 会话。
 每个 worker 都运行在独立 tmux 窗口里，
-拥有自己的 git worktree 和自己的 feature branch。
+拥有自己的 Git worktree 和自己的 feature branch。
 
 Worker 的基本原则只有一条：
 一个 worker 只处理一个 issue。
