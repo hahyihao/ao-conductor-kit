@@ -9,8 +9,8 @@ The committed source of truth is:
 
 Important:
 
-- This repo ships the local event sink and the AO-side webhook delivery pattern.
-- This repo does not ship your personal Claude Code inbox bridge or `~/.claude/settings.json`.
+- This repository ships the local event sink and the AO-side webhook delivery pattern.
+- This repository does not ship your personal Claude Code inbox bridge or `~/.claude/settings.json`.
 - Merge the example snippets below into your own config manually. Do not replace your real config files blindly.
 
 ## What The Callback Channel Does
@@ -56,14 +56,14 @@ system-reminder style callback context
 
 ## What Is Implemented Today
 
-Implemented in this repo:
+Implemented in this repository:
 
 - AO can send webhook notifications to a configured URL through the `webhook` notifier plugin.
 - `tools/ao-event-sink.mjs` listens on `127.0.0.1:8765` by default.
 - The sink writes normalized JSONL records to `.ao-inbox/events.jsonl`.
 - The sink exposes `GET /health` and accepts `POST /`.
 
-Not implemented in this repo as committed code:
+Not implemented in this repository as committed code:
 
 - The `.ao-inbox/cursor` consumer state file
 - The personal Claude Code `UserPromptSubmit` hook
@@ -239,11 +239,11 @@ Merge this into your real `~/.claude/settings.json` manually.
 }
 ```
 
-This repo does not ship `~/.claude/hooks/ao_inbox_bridge.py`. The snippet above is an example hook entry only.
+This repository does not ship `~/.claude/hooks/ao_inbox_bridge.py`. The snippet above is an example hook entry only.
 
 ## Example Bridge Script
 
-The bridge below is an example, not committed repo code. It uses a line-count cursor so the CEO only sees new events once.
+The bridge below is an example, not committed repository code. It uses a line-count cursor so the CEO only sees new events once.
 
 ```python
 #!/usr/bin/env python3
