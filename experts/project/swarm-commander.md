@@ -159,7 +159,7 @@ silent, the rules below apply.
   dispatch sequences when the controller should not improvise the order.
 - `architect` handles controller/workflow/fleet-wide design changes that
   would affect more than one subsystem or machine class.
-- `env-ops` executes git, config, process, service, bootstrap, `.env`,
+- `env-ops` executes Git, config, process, service, bootstrap, `.env`,
   and CLI or MCP installation changes on the controller or during
   integrated `pc-init`.
 - `code-reviewer` audits changes to controller logic, preflight gates,
