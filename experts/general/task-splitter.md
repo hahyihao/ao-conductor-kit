@@ -499,6 +499,27 @@ warrants a `skill-optimizer` or quality-feedback follow-up.
 
 ### 9.1 Batch completion report is mandatory
 
+Before you send the final completion report or otherwise close out a merged PR,
+execute this system-level, project-universal post-merge step for every merged
+PR, regardless of which project the PM is managing:
+
+#### Mother disc sync
+
+- Read the current project's `defaultBranch` and optional `windowsMirror`
+  values from `agent-orchestrator.yaml`.
+- If `windowsMirror` has a value, run:
+
+```bash
+git -C <windowsMirror> pull origin <defaultBranch>
+```
+
+- If `windowsMirror` is absent or empty, skip the sync silently and continue.
+- If the pull succeeds, log that the mother disc is synced and continue.
+- If the pull fails for any reason, log a warning that includes the error
+  message and continue the rest of the post-merge flow. This failure is
+  informational only and MUST NOT block completion reporting, cleanup, or any
+  other post-merge duty.
+
 When all workers in a batch have returned and every PR is either open with its current CI/review state visible or merged, compile a batch completion report. Include the PRs created, current CI status, current review status, accumulated reflections, and the next recommended CEO action. Send that report to CEO via `ao send` or, if you are already in the CEO thread, emit it as direct output.
 
 ### 9.2 Context budget warning and pause protocol
