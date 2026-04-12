@@ -51,16 +51,16 @@ The `base-skill` frontmatter records provenance only. Execute from the rules in 
 
 ## Rule Categories by Priority
 
-| Priority | Category                                | Impact   | Key Checks                                                       | Antipatterns                                                   |
-| -------- | --------------------------------------- | -------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1        | Brief quality gate (§11.1)              | CRITICAL | All 8 mandatory items present, expert guidance inlined           | Dispatching without restated goal, missing do-not-touch list   |
-| 2        | Splitting principles (§2)               | CRITICAL | Atomicity, independence, testability, self-contained             | Splitting single-file changes, dependent sub-tasks in parallel |
-| 3        | Expert injection (Expert doctrine)      | HIGH     | Correct expert mapping, inline doctrine, missing expert fallback | Naming experts without inlining, ignoring agent field          |
-| 4        | Mode decision (§3)                      | HIGH     | Correct A/B/C classification, proper worker count                | Defaulting to parallel, padding worker count                   |
+| Priority | Category                                | Impact   | Key Checks                                                       | Antipatterns                                                    |
+| -------- | --------------------------------------- | -------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1        | Brief quality gate (§11.1)              | CRITICAL | All 8 mandatory items present, expert guidance inlined           | Dispatching without restated goal, missing do-not-touch list    |
+| 2        | Splitting principles (§2)               | CRITICAL | Atomicity, independence, testability, self-contained             | Splitting single-file changes, dependent sub-tasks in parallel  |
+| 3        | Expert injection (Expert doctrine)      | HIGH     | Correct expert mapping, inline doctrine, missing expert fallback | Naming experts without inlining, ignoring agent field           |
+| 4        | Mode decision (§3)                      | HIGH     | Correct A/B/C classification, proper worker count                | Defaulting to parallel, padding worker count                    |
 | 5        | Pre-dispatch checklist (§5)             | HIGH     | All 14 checks pass, including the Expert Guidance gate           | Spawning without auth check, dispatching without expert context |
-| 6        | Monitoring & failure (§8)               | HIGH     | 5-min cadence, stuck detection, escalation thresholds            | Vague monitoring, silent retries, refusing to escalate         |
-| 7        | Recording & reflection (§9)             | MEDIUM   | Plan doc updated, reflections accumulated, batch report sent     | Missing plan doc, stranded reflections                         |
-| 8        | Context self-preservation (§9.2, §10.1) | MEDIUM   | 85% budget warning, 10/15/20 CEO message tracking                | Silent degradation, continuing past critical threshold         |
+| 6        | Monitoring & failure (§8)               | HIGH     | 5-min cadence, stuck detection, escalation thresholds            | Vague monitoring, silent retries, refusing to escalate          |
+| 7        | Recording & reflection (§9)             | MEDIUM   | Plan doc updated, reflections accumulated, batch report sent     | Missing plan doc, stranded reflections                          |
+| 8        | Context self-preservation (§9.2, §10.1) | MEDIUM   | 85% budget warning, 10/15/20 CEO message tracking                | Silent degradation, continuing past critical threshold          |
 
 ## Tools Available
 
