@@ -77,7 +77,7 @@ ao status
 
 `Mode B — single worker`
 适用于中等规模任务，但一个 Codex worker 足以完成。
-这时用下面的形式把完整指令发给一个 worker：
+这时默认优先使用第 3 节的稳定委派模式；只有消息很短、没有引号陷阱时，才退回下面这种 inline 形式：
 
 ```bash
 ao send <orchestrator-session> "..."
@@ -117,7 +117,45 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 - zero-backlog 仍然成立；允许推进下一个已显式存在的 canonical item，但禁止靠隐藏 backlog、memo、cache 或 state file 继续派活
 - self-heal 不是无限 retry：同一个 worker session 最多 8 个 turns（含初始 brief）；同一个 failure pattern 累计出现 3 次时，必须 kill 原 worker、spawn fresh worker，并把 failure context 写进 replacement brief / prompt
 
-## 3. Mode C 的 brief 编写协议
+## 3. 委派命令标准模式（Stable Dispatch Pattern）
+
+本节的读者是已经加载 `ao-conductor` skill 的 CEO。你的当前任务是稳定地把 brief 发给 worker 或 PM，而不是和 shell quoting 较劲。
+先直接按下面两步做，不要先退回 inline `ao send`。示例里的路径一律使用 WSL 原生路径，命令块按这个结构复制最稳。
+
+推荐固定走两步：
+
+- Step 1：先把 brief 写到 WSL 原生路径 `/root/<task>.txt`，例如：
+
+```bash
+cat >"/root/<task>.txt" <<'EOF'
+<brief>
+EOF
+```
+
+- Step 2：再用 Python 读取文件并调用 `ao send`：
+
+```bash
+python3 -c "import subprocess; subprocess.run(['ao','send','<session>', open('/root/<task>.txt').read().strip()[:500]])"
+```
+
+这是当前推荐的稳定模式，因为它能同时规避 shell quoting、长消息卡住，以及跨 Windows / WSL 路径歧义这三类常见故障。
+在 upstream `ao send` PR #50 合并前，都按这个模式执行；等它合并后，再评估是否废弃这个 Python workaround。
+
+这样做不是形式主义，而是为了稳定性。你要主动记住下面三类坑和对应规避方式：
+
+- 单引号 / 双引号混排：像 `ao send <session> 'msg with "quotes"'` 这种写法很容易在 shell quoting 上翻车，尤其当 brief 里还有更多引号、反斜杠或换行时。先写文件，再让 Python 用参数数组调用 `subprocess.run(...)`，可以绕开 Bash 重新解析整段消息。
+- 长消息：较长的 inline 消息可能触发已知的 F7 stuck input 问题，这是 upstream `ao send` PR #50 要修的内容之一。先落盘，再通过 Python 读取并切到 `[:500]`，可以明显降低输入缓冲卡住的概率。
+- 路径混淆：不要在 dispatch 示例里使用容易在 Windows / WSL 切换时引起歧义的临时路径约定。这个 skill 统一使用 `/root/<task>.txt` 这种明确的 WSL 原生路径，不要把宿主机路径、WSL 路径和临时文件位置混在一起。
+
+只有当消息同时满足“很短”“不含引号陷阱”“不需要多行”这三个条件时，才可以把 inline `ao send` 当作 fallback：
+
+```bash
+ao send <orchestrator-session> "..."
+```
+
+如果你用了 fallback，就要明确知道这只是短消息捷径，不是默认标准模式。
+
+## 4. Mode C 的 brief 编写协议
 
 在 Mode C 中，每个 worker 只能看到 issue body。
 这意味着你不能依赖主对话、不能依赖“项目里应该能看懂”、也不能依赖你脑中的隐含上下文。
@@ -178,7 +216,7 @@ Output constraints:
 如果 brief 里出现“参考上面的聊天记录”“按项目现状自行理解”“其余同前文”这种句子，说明它还不够自包含，必须重写。
 你还要主动检查 brief 是否真的把 URL、版本号、命令、配置片段写进去了，因为 worker 看不到你的脑内补完。
 
-## 4. Issue 创建协议
+## 5. Issue 创建协议
 
 brief 写完并落盘后，再为每一份 brief 创建 issue。
 命令格式固定为：
@@ -196,7 +234,7 @@ gh issue create --repo <owner/repo> --title "..." --body-file briefs/<slug>.md
 如果用户尚未完成 `gh auth login`、仓库没有权限、或当前 remote 不可写，同样停止并报告具体缺口。
 不要在 issue 没成功创建时假装流程已经走完。
 
-## 5. Spawn 协议
+## 6. Spawn 协议
 
 只有拿到全部 issue 号之后，你才进入 spawn。
 先切到 WSL 里的项目路径：
@@ -211,8 +249,8 @@ cd <project path in WSL>
 HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn <id1> <id2> <id3> ...
 ```
 
-如果你选择的是 Mode B，也要在 WSL 里带上代理，再通过 `ao send <orchestrator-session> "..."` 发送一整份清楚的任务指令。
-不要把代理细节省掉，也不要把一半上下文留在主对话里。
+如果你选择的是 Mode B，也要在 WSL 里带上代理，并优先按第 3 节的 Python 稳定模式发指令；只有短且没有引号陷阱的消息，才退回 `ao send <orchestrator-session> "..."`。
+不要把代理细节省掉，也不要把一半上下文留在主对话里，更不要把 fallback 当成默认模式。
 
 spawn 完成后，你必须把可观察入口告诉用户，至少包括两类 URL：
 
@@ -226,7 +264,7 @@ spawn 完成后，你必须把可观察入口告诉用户，至少包括两类 U
 用户说：“并行开发这三个独立文档，派给工人。”
 你应该说：“我选择 Mode C，因为任务可以拆成 3 个独立 brief。我会先写 `briefs/*.md`，创建对应 issues，再用 `HTTPS_PROXY=http://172.17.224.1:7897 ao batch-spawn ...` 启动 workers。启动后我会把 orchestrator URL 和每个 session URL 发给你，方便你实时看进度。”
 
-## 6. 监控协议
+## 7. 监控协议
 
 workers 跑起来以后，你的职责不是消失，而是持续监控。
 每隔几分钟运行一次：
@@ -244,7 +282,7 @@ ao status
 如果某个 session 长时间没有活动、branch 一直没推送、或者 PR 开了但 CI 卡住，你要主动指出风险。
 如果 orchestrator 消失、session 中断、或者 `ao status` 显示异常，先报告故障点，再说明下一步建议。
 
-### 6.1 PM 上下文健康巡检与暂停协议
+### 7.1 PM 上下文健康巡检与暂停协议
 
 除了常规 `ao status` 监控，你还必须主动检查 PM 是否已经接近上下文负载上限。用户提醒不是前提，只要下面任一条件成立，就立刻执行一次上下文健康检查：
 
@@ -275,7 +313,7 @@ ao send <PM> "列出你当前所有 pending 任务和你还记得的最早一条
 如果 summary 缺字段、含糊写成“按之前讨论”、或者已经出现明显记忆漂移，就不要继续用同一 PM 硬撑，直接走 handoff / replacement 路径。
 如果你决定继续使用同一 PM，下一条 `ao send` 必须引用这份 summary 作为事实基线，不要写“继续刚才那些”。
 
-## 7. 审阅协议
+## 8. 审阅协议
 
 当 `ao status` 显示 workers 已 `idle` 或 `done`，并且 PR 已经出现时，你进入 review。
 先列出 PR：
@@ -305,7 +343,7 @@ gh pr diff <pr-number>
 你要明确指出哪些 PR 适合 merge，哪些 PR 需要返工，以及返工原因。
 即使 diff 很大，也要压缩成高信息密度总结，而不是把整份 diff 改写一遍。
 
-## 8. 迭代协议
+## 9. 迭代协议
 
 当某个 PR 有问题时，你有两条标准路径。
 
@@ -320,9 +358,9 @@ gh pr diff <pr-number>
 你要写成可执行指令：补哪一节、删哪一处越界改动、保留哪一部分现有结构、完成后如何判断达标。
 
 如果是 review comment，尽量保持一句问题对应一条 comment，方便 worker 精准响应。
-如果是 follow-up issue，重新遵守第 3 节的 self-contained brief 规则，不要偷懒复用不完整上下文。
+如果是 follow-up issue，重新遵守第 4 节的 self-contained brief 规则，不要偷懒复用不完整上下文。
 
-### 8.1 ScheduleWakeup 自动监控规则
+### 9.1 ScheduleWakeup 自动监控规则
 
 只要本轮有一次 `ao send` 成功发出，你就要立即调用：
 
@@ -340,7 +378,7 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 4. 如果 `ao status` 仍然显示有 active sessions，就再设置一个 5 分钟后的 `ScheduleWakeup`，继续轮询。
 5. 如果 `ao status` 显示没有 active sessions，就停止轮询，不要续设新的 `ScheduleWakeup`。
 
-## 9. 何时不要使用这个 skill
+## 10. 何时不要使用这个 skill
 
 下面这些情况，你应该明确拒绝 dispatch，并说明为什么不适合 AO：
 
@@ -357,7 +395,7 @@ ScheduleWakeup(delaySeconds=300, reason="检查派发任务进度")
 用户说：“解释一下这个函数干嘛的。”
 你应该说：“我不使用 AO dispatch，因为这不是交付型任务，而是即时解释型任务。这里更适合直接阅读代码并解释行为。”
 
-## 10. 常见坑提醒
+## 11. 常见坑提醒
 
 每次使用这个 skill，都要主动提醒自己下面这些坑：
 
