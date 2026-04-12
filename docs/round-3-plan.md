@@ -2,14 +2,54 @@
 
 Status snapshot: 2026-04-12
 
-## Background and current status
+## Planning artifact status
 
+- [Issue #48](https://github.com/hahyihao/ao-conductor-kit/issues/48) requested a Round 3 planning artifact for dashboard visibility.
+- [PR #51](https://github.com/hahyihao/ao-conductor-kit/pull/51) on branch `feat/48` is the existing artifact branch, and `docs/round-3-plan.md` is the concrete planning file under review.
+- `main` does not currently contain a `docs/plans/` directory. Keep the Round 3 planning artifact here instead of creating a parallel plan location.
+- This file is planning only. It does not authorize Round 3 implementation, worker spawn, or worker preparation for parked issues [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) through [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46).
+
+## Current gate
+
+- `ROADMAP.md` places Round 3 after the Round 2 general-expert wave.
+- `ARCHITECTURE.md` keeps Round 3 blocked until Round 2 is complete, then packages 10 project experts.
 - Round 1 is complete and delivered 5 infra experts.
-- Round 2 has produced 8 general experts, but the merge gate is still open: [PR #22](https://github.com/hahyihao/ao-conductor-kit/pull/22), [PR #23](https://github.com/hahyihao/ao-conductor-kit/pull/23), [PR #24](https://github.com/hahyihao/ao-conductor-kit/pull/24), [PR #25](https://github.com/hahyihao/ao-conductor-kit/pull/25), [PR #26](https://github.com/hahyihao/ao-conductor-kit/pull/26), [PR #27](https://github.com/hahyihao/ao-conductor-kit/pull/27), [PR #28](https://github.com/hahyihao/ao-conductor-kit/pull/28), and [PR #29](https://github.com/hahyihao/ao-conductor-kit/pull/29) are not merged yet.
-- Round 3 remains parked until the Round 2 PR set is fully merged.
-- Current state: parked only. No Round 3 worker spawn yet.
+- Round 3 remains parked until the remaining Round 2 blockers clear.
+
+## Round 2 merge gate
+
+| PR | Expert | State on 2026-04-12 |
+|---|---|---|
+| [#22](https://github.com/hahyihao/ao-conductor-kit/pull/22) | `refactorer` | merged at `2026-04-12 08:54 UTC` |
+| [#23](https://github.com/hahyihao/ao-conductor-kit/pull/23) | `security-auditor` | open |
+| [#24](https://github.com/hahyihao/ao-conductor-kit/pull/24) | `script-writer` | open |
+| [#25](https://github.com/hahyihao/ao-conductor-kit/pull/25) | `debugger` | open |
+| [#26](https://github.com/hahyihao/ao-conductor-kit/pull/26) | `writer` | open |
+| [#27](https://github.com/hahyihao/ao-conductor-kit/pull/27) | `code-writer` | open |
+| [#28](https://github.com/hahyihao/ao-conductor-kit/pull/28) | `test-engineer` | open |
+| [#29](https://github.com/hahyihao/ao-conductor-kit/pull/29) | `planner` | open |
+
+- Remaining Round 2 blockers: [#23](https://github.com/hahyihao/ao-conductor-kit/pull/23), [#24](https://github.com/hahyihao/ao-conductor-kit/pull/24), [#25](https://github.com/hahyihao/ao-conductor-kit/pull/25), [#26](https://github.com/hahyihao/ao-conductor-kit/pull/26), [#27](https://github.com/hahyihao/ao-conductor-kit/pull/27), [#28](https://github.com/hahyihao/ao-conductor-kit/pull/28), and [#29](https://github.com/hahyihao/ao-conductor-kit/pull/29).
+- Until those PRs merge, Round 3 stays planning-only and parked.
+
+## Official Round 3 scope
+
+| Target expert | Source skill(s) | Parked issue |
+|---|---|---|
+| `experts/project/binance-trading.md` | `binance-trading-ops` | [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) |
+| `experts/project/xianyu-ops.md` | `xianyu-ops` | [#38](https://github.com/hahyihao/ao-conductor-kit/issues/38) |
+| `experts/project/tieba-operation.md` | `tieba-operation-master` | [#39](https://github.com/hahyihao/ao-conductor-kit/issues/39) |
+| `experts/project/novel-reader.md` | `novel-reader-review` | [#40](https://github.com/hahyihao/ao-conductor-kit/issues/40) |
+| `experts/project/game-automation.md` | `game-automation` | [#41](https://github.com/hahyihao/ao-conductor-kit/issues/41) |
+| `experts/project/ztc-optimizer.md` | `ztc-*` family | [#42](https://github.com/hahyihao/ao-conductor-kit/issues/42) |
+| `experts/project/chat-analysis.md` | `chat-analysis` | [#43](https://github.com/hahyihao/ao-conductor-kit/issues/43) |
+| `experts/project/qq-bot-audit.md` | `qq-bot-audit` | [#44](https://github.com/hahyihao/ao-conductor-kit/issues/44) |
+| `experts/project/douyin-content.md` | `douyin-*` family | [#45](https://github.com/hahyihao/ao-conductor-kit/issues/45) |
+| `experts/project/swarm-commander.md` | `swarm-commander + pc-init` | [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46) |
 
 ## Candidate pool scanned from the installed skill ecosystem
+
+This scan is planning rationale only. It is not an execution queue and does not permit worker prep while Round 3 is parked.
 
 | Candidate | Purpose summary | Why package into an expert | Effort |
 |---|---|---|---|
@@ -34,45 +74,16 @@ Status snapshot: 2026-04-12
 | `douyin-video-review` | Final video review and release gating for Douyin outputs. | High-value downstream gate, but still a sub-step of the full content system. | small |
 | `desktop-control` | Desktop interaction and control support for local operator workflows. | Useful helper capability, but not as differentiated as the final top-10 project domains. | medium |
 
-## Official Round 3 top 10
-
-| Target expert | Source skill(s) | Parked issue |
-|---|---|---|
-| `experts/project/swarm-commander.md` | `swarm-commander + pc-init` | [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46) |
-| `experts/project/ztc-optimizer.md` | `ztc-*` family | [#42](https://github.com/hahyihao/ao-conductor-kit/issues/42) |
-| `experts/project/douyin-content.md` | `douyin-*` family | [#45](https://github.com/hahyihao/ao-conductor-kit/issues/45) |
-| `experts/project/xianyu-ops.md` | `xianyu-ops` | [#38](https://github.com/hahyihao/ao-conductor-kit/issues/38) |
-| `experts/project/tieba-operation.md` | `tieba-operation-master` | [#39](https://github.com/hahyihao/ao-conductor-kit/issues/39) |
-| `experts/project/binance-trading.md` | `binance-trading-ops` | [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) |
-| `experts/project/chat-analysis.md` | `chat-analysis` | [#43](https://github.com/hahyihao/ao-conductor-kit/issues/43) |
-| `experts/project/qq-bot-audit.md` | `qq-bot-audit` | [#44](https://github.com/hahyihao/ao-conductor-kit/issues/44) |
-| `experts/project/game-automation.md` | `game-automation` | [#41](https://github.com/hahyihao/ao-conductor-kit/issues/41) |
-| `experts/project/novel-reader.md` | `novel-reader-review` | [#40](https://github.com/hahyihao/ao-conductor-kit/issues/40) |
-
-## Parked issue mapping
-
-| Issue | Planned expert |
-|---|---|
-| [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) | `binance-trading` |
-| [#38](https://github.com/hahyihao/ao-conductor-kit/issues/38) | `xianyu-ops` |
-| [#39](https://github.com/hahyihao/ao-conductor-kit/issues/39) | `tieba-operation` |
-| [#40](https://github.com/hahyihao/ao-conductor-kit/issues/40) | `novel-reader` |
-| [#41](https://github.com/hahyihao/ao-conductor-kit/issues/41) | `game-automation` |
-| [#42](https://github.com/hahyihao/ao-conductor-kit/issues/42) | `ztc-optimizer` |
-| [#43](https://github.com/hahyihao/ao-conductor-kit/issues/43) | `chat-analysis` |
-| [#44](https://github.com/hahyihao/ao-conductor-kit/issues/44) | `qq-bot-audit` |
-| [#45](https://github.com/hahyihao/ao-conductor-kit/issues/45) | `douyin-content` |
-| [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46) | `swarm-commander` |
-
 ## Selection rationale
 
 - The selected 10 cover the highest-value project routing surfaces without fragmenting Round 3 into too many narrow experts.
 - `swarm-commander + pc-init` was merged so PC fleet control and machine admission live behind one host-side expert.
 - The `ztc-*` family was merged into `ztc-optimizer` so shop routing, patrol, keyword, product, and store work stay under one single-shop hub.
 - The `douyin-*` family was merged into `douyin-content` so creation, review, layout, and final video gates stay in one content-pipeline expert.
-- Lower-ranked scanned candidates such as `pc-init`, the individual `ztc-*` subskills, the individual `douyin-*` stages, and `desktop-control` are still useful inputs, but they package better as merged capabilities than as separate Round 3 expert slots.
+- Lower-ranked scanned candidates such as standalone `pc-init`, the individual `ztc-*` subskills, the individual `douyin-*` stages, and `desktop-control` are still useful inputs, but they package better as merged capabilities than as separate Round 3 expert slots.
 
-## Trigger conditions
+## Execution guardrails
 
-- Round 3 worker spawn must wait until the Round 2 PR set is merged: [#22](https://github.com/hahyihao/ao-conductor-kit/pull/22), [#23](https://github.com/hahyihao/ao-conductor-kit/pull/23), [#24](https://github.com/hahyihao/ao-conductor-kit/pull/24), [#25](https://github.com/hahyihao/ao-conductor-kit/pull/25), [#26](https://github.com/hahyihao/ao-conductor-kit/pull/26), [#27](https://github.com/hahyihao/ao-conductor-kit/pull/27), [#28](https://github.com/hahyihao/ao-conductor-kit/pull/28), [#29](https://github.com/hahyihao/ao-conductor-kit/pull/29).
-- Until that merge gate clears, Round 3 stays parked only and no worker should be spawned for issues [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) through [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46).
+- Do not spawn or prepare implementation workers for parked issues [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) through [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46) while Round 2 blockers [#23](https://github.com/hahyihao/ao-conductor-kit/pull/23) through [#29](https://github.com/hahyihao/ao-conductor-kit/pull/29) are still open.
+- The parked issues already define the implementation entry points; no extra Round 3 pre-work queue should be created before the Round 2 gate clears.
+- When the gate clears, resume from this file plus parked issues [#37](https://github.com/hahyihao/ao-conductor-kit/issues/37) through [#46](https://github.com/hahyihao/ao-conductor-kit/issues/46) instead of creating a separate `docs/plans/` artifact.
