@@ -45,7 +45,14 @@ The `base-skill` frontmatter records provenance only. Execute from the rules in 
 
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
-5. **Monitor.** Run `ao status` immediately after every `ao spawn` / `ao batch-spawn`, every 5 minutes while workers are active, and whenever a CI/review notification arrives, because vague monitoring windows let stuck or `working-but-output-stuck` sessions hide in plain sight. If a worker stalls, errors repeatedly, or strays from its brief, intervene via `ao send` or escalate to CEO. Track your own context budget too; when you approach the warning threshold in §10.2, pause and surface state before silent degradation starts.
+5. **Monitor.** Run `ao status` immediately after every `ao spawn` /
+   `ao batch-spawn`, every 5 minutes while workers are active, and whenever a
+   CI/review notification arrives, because vague monitoring windows let stuck
+   or `working-but-output-stuck` sessions hide in plain sight. If a worker
+   stalls, errors repeatedly, or strays from its brief, intervene via
+   `ao send` or escalate to CEO. Track your own context budget too; when you
+   approach the warning threshold in §10.2, pause and surface state before
+   silent degradation starts.
 
 ---
 
@@ -274,7 +281,11 @@ One issue per brief, created with `gh issue create --body-file <brief>`. Record 
 
 ### 4.4 Spawn
 
-Before any `ao spawn` or `ao batch-spawn`, read the target expert's frontmatter and resolve its `agent` and `model` fields. If the repo documents a newer routing plan, follow it; otherwise use the baseline introduced in commit `611c94a`: PM plus review/reasoning experts stay on Opus, and analysis-oriented experts stay on Sonnet.
+Before any `ao spawn` or `ao batch-spawn`, read the target expert's
+frontmatter and resolve its `agent` and `model` fields. If the repository
+documents a newer routing plan, follow it; otherwise use the baseline
+introduced in commit `611c94a`: PM plus review/reasoning experts stay on
+Opus, and analysis-oriented experts stay on Sonnet.
 
 - `agent: claude-code` means the worker MUST use the claude-code path. Include `--agent claude-code` in the spawn command. For claude-code workers, the environment MUST provide `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`.
 - `agent: codex` or no `agent` field means keep the current codex/default spawn path.
@@ -299,36 +310,36 @@ document.
 
 Use the narrowest tool that fits the job, because dedicated tools preserve structure and reduce avoidable shell error.
 
-#### AO CLI tools
+#### AO command-line tools
 
-| Tool | Use it for | Key constraint |
-| --- | --- | --- |
-| `ao status` | Check orchestrator and worker session health. | Run it after every dispatch, every 5 minutes during active work, and on each CI/review event. |
-| `ao send <session> "<message>"` | Send status checks, instructions, and forwarded feedback to a running worker. | Keep messages concrete and scoped to the target session. |
-| `ao spawn <issue>` / `ao spawn --agent claude-code <issue>` | Spawn one worker for Mode B. | Resolve the target expert's `agent` and `model` first; use the explicit `--agent claude-code` path when required. |
-| `ao batch-spawn <ids...>` / `ao batch-spawn --agent claude-code <ids...>` | Spawn multiple workers for Mode C. | Prefix with `HTTPS_PROXY=http://172.17.224.1:7897` and batch only issues that resolve to the same agent. |
-| `ao session ls -p <project>` | List project sessions with status. | Use it to locate live, stuck, or recently finished sessions before intervening. |
-| `ao session kill <session>` | Terminate a stuck or runaway worker. | Use it only when the failure-handling rules say the session must be replaced or stopped. |
-| `ao session cleanup -p <project>` | Clean up merged or completed sessions. | Do not clean up active sessions that still own open work. |
+| Tool                                                                      | Use it for                                                                    | Key constraint                                                                                                    |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `ao status`                                                               | Check orchestrator and worker session health.                                 | Run it after every dispatch, every 5 minutes during active work, and on each CI/review event.                     |
+| `ao send <session> "<message>"`                                           | Send status checks, instructions, and forwarded feedback to a running worker. | Keep messages concrete and scoped to the target session.                                                          |
+| `ao spawn <issue>` / `ao spawn --agent claude-code <issue>`               | Spawn one worker for Mode B.                                                  | Resolve the target expert's `agent` and `model` first; use the explicit `--agent claude-code` path when required. |
+| `ao batch-spawn <ids...>` / `ao batch-spawn --agent claude-code <ids...>` | Spawn multiple workers for Mode C.                                            | Prefix with `HTTPS_PROXY=http://172.17.224.1:7897` and batch only issues that resolve to the same agent.          |
+| `ao session ls -p <project>`                                              | List project sessions with status.                                            | Use it to locate live, stuck, or recently finished sessions before intervening.                                   |
+| `ao session kill <session>`                                               | Terminate a stuck or runaway worker.                                          | Use it only when the failure-handling rules say the session must be replaced or stopped.                          |
+| `ao session cleanup -p <project>`                                         | Clean up merged or completed sessions.                                        | Do not clean up active sessions that still own open work.                                                         |
 
-#### GitHub CLI tools
+#### GitHub command-line tools
 
-| Tool | Use it for | Key constraint |
-| --- | --- | --- |
+| Tool                                  | Use it for                                             | Key constraint                                                                                    |
+| ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `gh issue create --body-file <brief>` | Create one GitHub issue from one self-contained brief. | The brief file must already contain the full worker context; do not depend on plan-file pointers. |
-| `gh pr view <N>` | Inspect PR state, CI state, and review state. | Use it for observable completion checks; do not treat a local branch as finished work. |
-| `gh auth status` | Verify GitHub authentication before dispatch. | A failed auth check is a hard stop in the pre-dispatch checklist. |
+| `gh pr view <N>`                      | Inspect PR state, CI state, and review state.          | Use it for observable completion checks; do not treat a local branch as finished work.            |
+| `gh auth status`                      | Verify GitHub authentication before dispatch.          | A failed auth check is a hard stop in the pre-dispatch checklist.                                 |
 
 #### Claude Code tools
 
-| Tool | Use it for | Key constraint |
-| --- | --- | --- |
-| `Read` | Read files and brief sources. | Prefer it over `cat`, `head`, or `tail` for file inspection. |
-| `Write` | Create new files such as briefs or plan documents. | Use it for new files only; keep generated artifacts self-contained. |
-| `Edit` | Modify existing files. | Use it instead of ad hoc shell editing so the change stays inspectable. |
-| `Grep` | Search file contents. | Prefer it over `grep` or `rg` when the dedicated tool is available. |
-| `Glob` | Find files by pattern. | Prefer it over `find` or directory listing when you need discovery by path shape. |
-| `Bash` | Run project CLIs and shell commands that dedicated tools do not cover. | Use it only when `Read` / `Write` / `Edit` / `Grep` / `Glob` do not fit. |
+| Tool    | Use it for                                                             | Key constraint                                                                    |
+| ------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Read`  | Read files and brief sources.                                          | Prefer it over `cat`, `head`, or `tail` for file inspection.                      |
+| `Write` | Create new files such as briefs or plan documents.                     | Use it for new files only; keep generated artifacts self-contained.               |
+| `Edit`  | Modify existing files.                                                 | Use it instead of ad hoc shell editing so the change stays inspectable.           |
+| `Grep`  | Search file contents.                                                  | Prefer it over `grep` or `rg` when the dedicated tool is available.               |
+| `Glob`  | Find files by pattern.                                                 | Prefer it over `find` or directory listing when you need discovery by path shape. |
+| `Bash`  | Run project CLIs and shell commands that dedicated tools do not cover. | Use it only when `Read` / `Write` / `Edit` / `Grep` / `Glob` do not fit.          |
 
 ---
 
