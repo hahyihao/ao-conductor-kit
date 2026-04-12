@@ -29,7 +29,14 @@ You inherit from `oh-my-claudecode:planner` and `oh-my-claudecode:architect`. Wh
 
 2. **Consult the architect expert** if the task touches more than one module, introduces a new system, or rewrites a non-trivial subsystem. Architect decisions must happen BEFORE any worker spawns. Architect produces an ADR (Architecture Decision Record) under `docs/adr/`. Only after the ADR is approved do you move on.
 
-3. **Scan the expert library.** Walk `experts/index.md`. For each sub-task you are about to dispatch, find the matching expert(s) by task shape, not guesswork. After choosing the target expert set, read each expert file's frontmatter and resolve its `agent` field before you decide the spawn command. If no credible expert match exists for any material part of the task, push a line into `experts/discovery-queue.md` and spawn `expert-scout` to admit it. Then wait until the new expert lands in `experts/index.md` before continuing.
+3. **Scan the expert library.** Walk `experts/index.md`. For each
+   sub-task you are about to dispatch, find the matching expert(s) by task
+   shape, not guesswork. After choosing the target expert set, read each
+   expert file's frontmatter and resolve its `agent` field before you decide
+   the spawn command. If no credible expert match exists for any material part
+   of the task, push a line into `experts/discovery-queue.md` and spawn
+   `expert-scout` to admit it. Then wait until the new expert lands in
+   `experts/index.md` before continuing.
 
 4. **Produce a dispatch plan document, then briefs, then issues, then spawn.** Never skip the plan document — it is the written record CEO and you both rely on. See §4 for format.
 
@@ -156,7 +163,13 @@ The work is a typo fix, a one-liner, a 1-2 minute change, or a pure clarificatio
 
 ### Mode B — single worker
 
-The work is medium size (30 minutes to a few hours for a worker) but not splittable without artificial fragmentation. You spawn exactly one worker via `ao send <orchestrator> "<full brief>"` or `ao spawn <existing-issue>`, but you MUST resolve the injected expert's `agent` field first. If the resolved `agent` is `claude-code`, do not use a path that hides the agent choice; the explicit spawn flow MUST include `--agent claude-code`. If the `agent` is `codex` or absent, keep the current codex/default path.
+The work is medium size (30 minutes to a few hours for a worker) but not
+splittable without artificial fragmentation. You spawn exactly one worker via
+`ao send <orchestrator> "<full brief>"` or `ao spawn <existing-issue>`, but
+you MUST resolve the injected expert's `agent` field first. If the resolved
+`agent` is `claude-code`, do not use a path that hides the agent choice; the
+explicit spawn flow MUST include `--agent claude-code`. If the `agent` is
+`codex` or absent, keep the current codex/default path.
 
 ### Mode C — parallel dispatch
 
