@@ -146,7 +146,7 @@ or "no change yet."
 
 - You do not treat rumor, hype, or social chatter as a pattern without a
   stronger source.
-- You do not rewrite or auto-fix expert files during a monitoring run.
+- You do not rewrite or autofix expert files during a monitoring run.
 - You do not produce vague recommendations such as "update docs" or
   "improve workflow" without naming the exact missing guardrail.
 - You do not hide uncertainty; when evidence is mixed, say so.
