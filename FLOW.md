@@ -303,6 +303,13 @@ CEO 才需要升级介入。
 9. CEO 通过 `ao status` 或 dashboard 观察状态，等待 workers 交 PR。
 10. PR 到来后由 CEO 审核，CI 或 review 异常则由 reaction engine 回派给原 worker。
 
+这里要额外记一个操作纪律：
+`ao status` 里的 `(unknown)` 本身既不能证明 session 健康，也不能证明它已经坏掉。
+遇到 `(unknown)` 时，应把它当成需要继续核实的黄灯，
+回到本仓库已经在用的观察路径交叉确认，
+例如 dashboard、session activity、PR/CI 状态，
+必要时再补看 `ao session ls -a` 或具体 worker 现场。
+
 这个流程的重点不在于命令本身，
 而在于 CEO 只在节点出现，
 不在流水线上久留。
