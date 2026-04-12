@@ -1,4 +1,6 @@
-1. Root Cause
+# Worker Report: Bug 2 Send Paste Race
+
+## 1. Root Cause
 
 - The root cause is both parts together.
 - First, the real delivery bug is a tmux `paste-buffer` to `Enter` race in [`/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts`](/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts): multi-line and long messages go through the paste path, but AO 0.2.2 sends `Enter` after a fixed 300 ms delay, which is not reliable for Codex/Ink-style TUIs once the pasted draft is still rendering.
@@ -6,16 +8,16 @@
 - The minimal 0.2.2-friendly fix is therefore to harden the runtime send path itself: wait for pasted content to settle, retry `Enter`, and fail explicitly when the draft is still visibly unsubmitted after all retries.
 - I did not choose the broader transports discussed in #853 and #184 because they are architecture work, not a small 0.2.2 patch.
 
-2. Changed Files
+## 2. Changed Files
 
 - Modified [`/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts`](/root/agent-orchestrator/packages/plugins/runtime-tmux/src/index.ts)
   Adds paste-buffer detection constants, pane capture helpers, draft/submission heuristics, paste-settle waiting, repeated `Enter` retries, and an explicit error when the draft remains visible after all retries.
 - Modified [`/root/agent-orchestrator/packages/plugins/runtime-tmux/src/__tests__/index.test.ts`](/root/agent-orchestrator/packages/plugins/runtime-tmux/src/__tests__/index.test.ts)
   Adds coverage for long-message settle/submit flow, multiline content with Windows-style backslashes, retry-on-still-draft behavior, and explicit failure when submission cannot be confirmed.
-- Generated vendored patch [`/root/.worktrees/ao-kit-slot-2/kit2-2/patches/ao-0.2.2-bug2-send-paste-race.patch`](/root/.worktrees/ao-kit-slot-2/kit2-2/patches/ao-0.2.2-bug2-send-paste-race.patch)
+- Generated vendored patch `patches/ao-0.2.2-bug2-send-paste-race.patch`
 - I intentionally did not modify [`/root/agent-orchestrator/packages/core/src/tmux.ts`](/root/agent-orchestrator/packages/core/src/tmux.ts) or [`/root/agent-orchestrator/packages/core/src/__tests__/tmux.test.ts`](/root/agent-orchestrator/packages/core/src/__tests__/tmux.test.ts) to keep the patch scoped to the active `ao send` production path for this bug.
 
-3. Test / Validation Results
+## 3. Test / Validation Results
 
 - `pnpm -C /root/agent-orchestrator/packages/plugins/runtime-tmux test src/__tests__/index.test.ts`
   Passed: 28 tests.
@@ -28,11 +30,11 @@
   repeated visible-draft failure now throws instead of returning silent success.
 - I did not run a full repo test sweep, and I did not modify unrelated bug-1 / bug-3 files.
 
-4. Generated Patch File
+## 4. Generated Patch File
 
-- [`/root/.worktrees/ao-kit-slot-2/kit2-2/patches/ao-0.2.2-bug2-send-paste-race.patch`](/root/.worktrees/ao-kit-slot-2/kit2-2/patches/ao-0.2.2-bug2-send-paste-race.patch)
+- `patches/ao-0.2.2-bug2-send-paste-race.patch`
 
-5. Recommended Upstream Issue / PR References
+## 5. Recommended Upstream Issue / PR References
 
 - Issue #373: long-message paste-buffer `Enter` race background
 - Issue #564: paste succeeded visually but submit/confirmation was false-positive
