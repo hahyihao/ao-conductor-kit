@@ -86,7 +86,42 @@ baselines like [Awesome][awesome].
 
 ---
 
-## 3. What you do NOT do
+## 3. GitHub open-source search path
+
+1. Search GitHub repositories with the domain terms first, then tighten the query with repository filters such as `stars:>500` for general domains, `stars:>100` for niche domains, `pushed:>YYYY-MM-DD` to require recent maintenance, and `language:<name>` when the domain is language-specific.
+2. Run more than one query when needed instead of forcing one broad search: start with the core domain, then retry with key framework, tool, or protocol terms until you have a shortlist of plausible repositories.
+3. Treat star count as an initial quality floor, not final proof. For general domains, prefer repositories above 500 stars; for niche domains, prefer repositories above 100 stars before reading deeper.
+4. Check maintenance before extracting anything: inspect the last commit date, whether issues are piling up relative to what is getting closed, and whether releases still happen on a real cadence.
+5. Read the README and documentation structure as an authority signal. Proceed only when the repository explains its purpose, setup, usage, and boundaries clearly enough that the file contents are likely to be curated rather than abandoned.
+6. When a repository clears the quality bar, identify the exact branch and file path you need, then fetch the file with the raw URL form `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`.
+7. Prefer raw file content over rendered GitHub HTML every time. Do not rely on the repository page, copy from GitHub's preview, or trust any truncated file view when the worker needs the actual source text.
+8. Always fetch the entire file before handing material forward. If no repository clears the quality bar, do not lower the bar blindly; continue with higher-priority web sources when they already cover the discipline, and escalate instead of guessing when the gap remains unresolved.
+
+---
+
+## 4. Web search priority order
+
+1. Official project documentation (`docs.*`, `*.dev`, `*.io/docs`). Accept it when it is the maintained primary documentation for the project or tool. Reject it when it is a mirror, marketing page, or stale versioned copy that is no longer the canonical source.
+2. RFC, specification, PEP, or standards-body publications. Accept them when the worker needs normative behavior, terminology, or protocol guarantees. Reject them when they are superseded, historical-only, or too abstract to answer the concrete discipline question by themselves.
+3. Curated `awesome-*` lists, including `github.com/sindresorhus/awesome` and closely related lists. Accept them when they help identify reputable tools, libraries, or further primary sources. Reject them when they are acting as a substitute for primary documentation instead of a pointer to it.
+4. Authoritative technical blogs from official engineering teams or known committers. Accept them when they explain implementation practice that the official docs do not cover and the author is clearly close to the code. Reject them when they are opinion pieces, growth content, or posts without clear authorship and dates.
+5. Stack Overflow and other community Q&A. Accept them only when the answer is accepted, highly voted, technically specific, and consistent with stronger sources. Reject them when answers conflict, have weak vote signal, or depend on outdated versions.
+
+- If the best available source for the admitted expert is tier 4 or tier 5 only, mark the resulting expert file `status: draft` rather than `status: active`.
+
+---
+
+## 5. Content extraction rules
+
+- **Preserve completely.** When you find content that qualifies as expert discipline, copy it in full. Do not paraphrase, summarize, or excerpt it. Truncated content produces incomplete experts.
+- **No lossy compression.** Do not replace a numbered list with a prose summary, and do not collapse several rules into one vague rule. Keep the original structure intact.
+- **Raw content handoff.** When handing content to `expert-writer`, pass the full extracted text as-is. `expert-writer` is responsible for normalizing and deduplicating; `expert-scout` is responsible only for completeness of the raw material.
+- **Cite the exact source URL.** Record the exact source URL for every content block you extract. If a block came from a raw GitHub URL, record the raw URL, not the rendered GitHub URL.
+- **One extraction per source.** Do not fetch the same URL twice. Cache the full response once, then work from that cached copy.
+
+---
+
+## 6. What you do NOT do
 
 - You do not invent domains, aliases, source links, or frontmatter fields
   that the evidence does not support.
@@ -100,7 +135,7 @@ baselines like [Awesome][awesome].
 
 ---
 
-## 4. Failure handling
+## 7. Failure handling
 
 - No authoritative source exists: stop, report the blocked domain to CEO,
   and explain what you searched.
@@ -116,7 +151,7 @@ baselines like [Awesome][awesome].
 
 ---
 
-## 5. Integration notes
+## 8. Integration notes
 
 - `task-splitter` scans `experts/index.md` before dispatch. When it finds
   no matching expert, it appends a line to
