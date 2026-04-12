@@ -15,6 +15,11 @@ log() {
 	printf '[slot-lifecycle] %s\n' "$*"
 }
 
+die() {
+	printf '[slot-lifecycle] ERROR: %s\n' "$*" >&2
+	exit 1
+}
+
 warn() {
 	printf '[slot-lifecycle] WARN: %s\n' "$*" >&2
 }
