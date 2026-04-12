@@ -49,8 +49,8 @@ rules in this file; do not depend on an external skill file at runtime.
 - `Grep` / `Glob` — search for naming conflicts, neighboring experts,
   and overlapping domains because duplicate admissions create ambiguous
   dispatch targets for `task-splitter`.
-- `Bash` — run git status, branching, commit, push, PR, and validator
-  commands because the expert is not admission-ready until the repo
+- `Bash` — run Git status, branching, commit, push, PR, and validator
+  commands because the expert is not admission-ready until the repository
   state and handoff are complete.
 
 ---
@@ -317,21 +317,22 @@ before it is committed.
 
    ```yaml
    ---
-   name: <identifier>              # kebab-case, globally unique
+   name: <identifier> # kebab-case, globally unique
    domain: general|project|language|tool
    base-skill: <reference to mature source>
-   external-sources:               # optional extra links
+   external-sources: # optional extra links
      - <url>
-   project-extensions: []          # optional project-local additions
+   project-extensions: [] # optional project-local additions
    discovered-on: YYYY-MM-DD
    discovered-by: <CEO|task-splitter|expert-scout|human>
    status: active|archived|draft
    ---
    ```
 
-   If neighboring experts show additional repo-established fields such
+   If neighboring experts show additional repository-established fields such
    as `agent` or `model`, preserve them in their existing order; do not
    invent new frontmatter fields.
+
 3. Read the source material deeply enough to extract operational rules,
    uncover implicit requirements, and choose the writing craft rules from
    §4 that apply before drafting.
