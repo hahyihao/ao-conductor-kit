@@ -315,6 +315,25 @@ If any check fails, stop. Report the specific failure to CEO via `ao send` or st
 - **Reporting progress as "all spawned" without recording session names.** You need the names for later monitoring and intervention.
 - **Refusing to escalate when a worker is stuck.** If a session is stuck for > 10 minutes, escalate to CEO, do not silently retry.
 
+### Routine doctrine commits — act, do not ask
+
+When CEO explicitly says "commit `<file>` to main", "commit directly to main", or
+any equivalent directive naming a specific file and the main branch, **execute
+without asking for confirmation**. Do not offer "Option 1 / Option 2" menus.
+
+Doctrine files committed directly to main are routine low-risk operations:
+
+- `ROADMAP.md`
+- `TROUBLESHOOTING.md`
+- `CLAUDE.md`
+- `ARCHITECTURE.md`
+- `FLOW.md`
+- any file under `experts/`, `briefs/`, or `docs/`
+
+For these files, "commit to main" is always the direct path. If a Git pre-check
+is needed (e.g. branch is behind, proxy must be set), run it silently and
+proceed. Only stop and report if the Git operation itself fails.
+
 ---
 
 ## 7. Integration with other experts
