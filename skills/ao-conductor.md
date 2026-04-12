@@ -70,6 +70,64 @@ type: skill
 | 7        | Monitoring + Review + Iteration     | High     | `ao status` 持续巡检；review 要总结文件、规模、brief 符合度、风险；反馈必须可执行                                                         | CEO 派完就消失，或 review 只给“看起来不错”                                                                                                  |
 | 8        | Quality Feedback Loop               | Medium   | 记录 incident；区分 result / artifact / process / doctrine 四层；只 patch 最深的已证实根因                                                | 只在聊天里口头总结，不把系统性缺口沉淀成 doctrine / reference / expert 更新                                                                 |
 
+## Quick Reference
+
+先扫这一节，再进入后面的完整协议。这里按“事实 / 指导 / 示例”分开写，方便 10 秒内完成现场判断。
+
+### 环境检查命令
+
+这些是可直接执行的现场检查命令；它们只回答“环境现在能不能 dispatch”，不替代第 1 节的完整解释。
+
+```bash
+grep -i microsoft /proc/version
+tmux ls
+ao --version
+codex --version
+env | grep -i proxy || true
+ao status
+```
+
+### 模式选择摘要
+
+这是快速分流规则；正式判断仍以第 2 节为准。
+
+| Workflow shape | Mode | 何时使用 | 默认动作 |
+| --- | --- | --- | --- |
+| Single | Mode A — direct | 单文件、单点改动、预计 15 分钟内完成 | 直接编辑，不 dispatch |
+| Serial | Mode B — single worker | 中等规模，但一个 worker 足以完成 | 走 Stable Dispatch Pattern |
+| Parallel | Mode C — parallel dispatch | 至少 3 个互不重叠子任务，且每份 brief 都可 self-contained | `ao batch-spawn` |
+
+### PM 路由表
+
+这是规范性映射。先按目标文件类型选 PM，再做健康度与空闲度检查。
+
+| Task type | PM slot | Session | Target paths |
+| --------- | ------- | ------- | ------------ |
+| Expert files (Round N, scout, expert add/edit, index) | PM-expert | kit1-orchestrator-1 | `experts/` |
+| Infra (scripts, CI, tools, bootstrap, dependabot) | PM-infra | kit2-orchestrator-1 | `scripts/`, `.github/`, `tools/` |
+| Doctrine/Skill (ARCHITECTURE, FLOW, ROADMAP, skills) | PM-doctrine | kit3-orchestrator-1 | `ARCHITECTURE.md`, `FLOW.md`, `ROADMAP.md`, `skills/*` |
+| Other/cross-type/unclear | PM-main | kit-orchestrator-23 | everything else |
+
+### Stable Dispatch Pattern 摘要
+
+这是推荐示例，不是理论说明。默认先落盘，再发 `ao send`。
+
+1. 把 brief 写到 WSL 原生路径 `/root/<task>.txt`。
+2. 用 Python one-liner 读取文件并发送给目标 session。
+
+```bash
+python3 -c "from pathlib import Path; import subprocess; subprocess.run(['ao','send','<session>', Path('/root/<task>.txt').read_text().strip()[:500]], check=True)"
+```
+
+### 10 秒验证
+
+这是 dispatch 后的最小验证动作；不要把 `message sent` 当成功。
+
+1. 等约 10 秒，先看 dashboard 是否出现目标 session 的 present signal。
+2. 用 `tmux capture-pane` peek 目标 pane，确认不是停在旧输出。
+3. 跑 `ao status`，确认目标 session 出现 `Working` 或其它 present signal。
+4. dashboard、pane、`ao status` 任一对不上，就立刻 self-heal，再复核一次。
+
 ## 1. 上下文检查
 
 skill 激活后的第一件事永远是环境检查。
@@ -186,6 +244,22 @@ dispatch 之后必须做 state-check，而不是把“message sent”当成功�
 - 同一 PM 不得同时持有超过 2 个不相关工作流的 context；如果没有合适的 idle slot，就排队、drain、或 scale up，不要继续往繁忙 PM 堆任务。
 - 只有健康、可观察、身份稳定的 slot 才能接任务。`unknown`、`offline`、dashboard/status 对不上的 PM 都视为不可派发。
 - 新 assignment 只有在 10 秒验证后出现可观察 activity，才算真正进入 `assigned`。
+
+下表是追加的默认硬路由。只要目标文件类型明确，就先按类型分到对应 PM slot；如果任务跨类型、目标文件不明确、或你自己都说不清 ownership，就回到 `PM-main`。
+
+| Task type | PM slot | Session | Target paths |
+| --------- | ------- | ------- | ------------ |
+| Expert files (Round N, scout, expert add/edit, index) | PM-expert | kit1-orchestrator-1 | `experts/` |
+| Infra (scripts, CI, tools, bootstrap, dependabot) | PM-infra | kit2-orchestrator-1 | `scripts/`, `.github/`, `tools/` |
+| Doctrine/Skill (ARCHITECTURE, FLOW, ROADMAP, skills) | PM-doctrine | kit3-orchestrator-1 | `ARCHITECTURE.md`, `FLOW.md`, `ROADMAP.md`, `skills/*` |
+| Other/cross-type/unclear | PM-main | kit-orchestrator-23 | everything else |
+
+下面这个 decision tree 是指导性判断，帮助你在 5 秒内做 first-pass routing：
+
+1. Target file under `experts/`? → `PM-expert`
+2. Target file under `scripts/`, `.github/`, `tools/`? → `PM-infra`
+3. Target file is `ARCHITECTURE.md`, `FLOW.md`, `ROADMAP.md`, or `skills/*`? → `PM-doctrine`
+4. Other, mixed, or unclear? → `PM-main`
 
 ### 3.2 Pre-Delivery Checklist
 
