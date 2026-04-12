@@ -4,6 +4,7 @@ defaults:
   runtime: tmux
   orchestrator:
     agent: claude-code
+    model: claude-opus-4-6
   worker:
     agent: codex
   workspace: worktree
