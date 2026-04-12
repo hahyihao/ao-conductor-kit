@@ -564,11 +564,13 @@ gh auth setup-git
 ## Example Workflow
 
 下面给一个完整示例。假设用户说：“给 dashboard component 加 dark-mode。”
+
 1. 先做 Mode 判断。
    - 这是交付型改动，不是解释型问题，所以不走 Mode A。
    - 目标集中在 dashboard UI，一条实现链通常就够，所以先选 `Mode B — single worker`。
    - 只有当你现场确认它实际拆成 3 个以上互不重叠的独立子任务时，才升级到 Mode C。
 2. 先检查环境是否能 dispatch。
+
    ```bash
    wsl -l -v
    ao --version
@@ -576,11 +578,14 @@ gh auth setup-git
    test -f agent-orchestrator.yaml && echo ok
    ao status
    ```
+
    - 只有 `Ubuntu-22.04`、AO、Codex、`agent-orchestrator.yaml` 和 running orchestrator 都正常时才继续。
+
 3. 选择 PM 路由。
    - 目标是 dashboard 组件代码，不属于 `experts/`、`.github/`、`tools/` 或 `skills/*`，所以先路由到 `PM-main`。
    - 目标 session 是 `kit-orchestrator-23`；如果这个 slot 不健康或过载，就先换健康 idle slot。
 4. 先写给 PM 的自然语言 brief。
+
    ```bash
    cat >"/root/dashboard-dark-mode.txt" <<'EOF'
    请接手一个 dashboard UI 改动。目标是在现有 dashboard component 上补 dark-mode 支持。
@@ -589,31 +594,41 @@ gh auth setup-git
    验收：dark theme 下可读、无明显样式回退、不改无关页面，PR 描述写清验证步骤。
    EOF
    ```
+
    - 这条消息是发给 PM 的协调指令，不是直接发给 worker 的最终 brief。
+
 5. 用两步稳定模式发送 `ao send`。
    ```bash
    python3 -c "from pathlib import Path; import subprocess; subprocess.run(['ao','send','kit-orchestrator-23', Path('/root/dashboard-dark-mode.txt').read_text().strip()[:500]], check=True)"
    ```
 6. 做 10 秒验证。
+
    ```bash
    tmux capture-pane -pt kit-orchestrator-23 | tail -n 40
    ao status
    ```
+
    - 你要确认目标 session 出现新的 present signal，例如 `Working`、新 branch 或 issue / PR activity。
    - 如果 pane 还停在旧输出、`ao status` 没变化、或 `ao send` 卡住，就立刻补 Enter、重发或回到 Python 两步法。
+
 7. 进入监控。
+
    ```bash
    ao status
    gh pr list --repo <owner/repo>
    ```
+
    - 对用户汇报紧凑摘要，例如：PM 已接单、worker 已开分支、PR `#NNN` 已创建、CI 正在跑。
    - 如果 session 长时间无活动、PR 没出现、或 CI 卡住，就按监控协议升级处理，不要放着不看。
+
 8. 做 review 并 merge。
+
    ```bash
    gh pr view NNN --repo <owner/repo>
    gh pr diff NNN --repo <owner/repo>
    gh pr merge NNN --repo <owner/repo> --squash --delete-branch
    ```
+
    - 先确认改动聚焦在 dashboard 相关路径，真的覆盖了 dark-mode，没有越界修改。
    - reviewer / CI 都通过后再 merge，并向用户汇报 PR `#NNN` 已合并、branch 已清理、AO 池是否空闲。
 
