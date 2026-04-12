@@ -3,11 +3,28 @@
 All notable changes to the AO Conductor Kit are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `patches/ao-main-2ebe111a-pr-feedback-context.patch` — upstream AO patch
+  that adds concrete CI/review feedback context to lifecycle auto-reroutes and
+  caps review auto-feedback retries at 2 by default
+
+### Changed
+
+- `experts/general/task-splitter.md` — now makes `ci_failed` / review
+  auto-routing explicit and escalates after 2 auto-feedback loops on the same
+  PR
+- `templates/agent-orchestrator.yaml` and `templates/project-CLAUDE.md` —
+  document the 2-retry PR feedback loop expectation for project configs
+
 ## [0.2.0] — 2026-04-11
 
 ### Added
+
 - `LICENSE` — MIT license
-- `VERSION` — semver source of truth
+- `VERSION` — SemVer source of truth
 - `CHANGELOG.md` — this file
 - `SECURITY.md` — secrets handling policy and responsible disclosure
 - `scripts/verify-install.sh` — smoke test that verifies all 9 components are installed and reachable
@@ -21,15 +38,18 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `.github/ISSUE_TEMPLATE/feature_request.md` — structured feature requests
 
 ### Fixed
+
 - `scripts/bootstrap-wsl2.ps1` — replaced the `.AUTHOR: TODO` placeholder with an actual author identifier
 
 ### Changed
+
 - `ci-staging/` removed; all helper scripts moved to `tools/`
 - `.gitignore` — no longer hides tools (now versioned), still hides `wsl_update_x64.msi` and `.omc/`
 
 ## [0.1.0] — 2026-04-11
 
 ### Added — initial release (mother disc)
+
 - `README.md` — master entry point with 3 usage scenarios
 - `CLAUDE.md` — project-level Claude Code context for the mother disc directory
 - `INSTALL.md` (669 lines) — 8-phase install guide, written by Codex worker `demo-6` from AO issue #11
@@ -50,7 +70,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ci-staging/` — intermediate artifacts (superseded by `tools/` in v0.2)
 
 ### Generation method
+
 v0.1 was produced via AO self-dispatch in about 8 minutes:
+
 - CEO (Claude Opus) wrote 6 detailed briefs to `briefs/`
 - Created 6 GitHub issues (`#9`–`#14`) in `hahyihao/ao-test`
 - `ao batch-spawn 9 10 11 12 13 14` launched 6 parallel Codex workers

@@ -1,0 +1,429 @@
+diff --git a/packages/core/src/__tests__/config-validation.test.ts b/packages/core/src/__tests__/config-validation.test.ts
+index 9de7d3df..15d8f057 100644
+--- a/packages/core/src/__tests__/config-validation.test.ts
++++ b/packages/core/src/__tests__/config-validation.test.ts
+@@ -234,6 +234,30 @@ describe("Config Validation - Session Prefix Uniqueness", () => {
+   });
+ });
+ 
++describe("Config Validation - Default Reactions", () => {
++  it("caps CI and review auto-feedback retries at 2 by default", () => {
++    const validated = validateConfig({
++      projects: {
++        proj1: {
++          path: "/repos/integrator",
++          repo: "org/integrator",
++          defaultBranch: "main",
++        },
++      },
++    });
++
++    expect(validated.reactions["ci-failed"]).toMatchObject({ retries: 2, escalateAfter: 2 });
++    expect(validated.reactions["changes-requested"]).toMatchObject({
++      retries: 2,
++      escalateAfter: 2,
++    });
++    expect(validated.reactions["bugbot-comments"]).toMatchObject({
++      retries: 2,
++      escalateAfter: 2,
++    });
++  });
++});
++
+ describe("Config Validation - Session Prefix Regex", () => {
+   it("accepts valid session prefixes", () => {
+     const validPrefixes = ["int", "app", "my-app", "app_v2", "app123"];
+diff --git a/packages/core/src/__tests__/lifecycle-manager.test.ts b/packages/core/src/__tests__/lifecycle-manager.test.ts
+index 1298d9ed..e674d683 100644
+--- a/packages/core/src/__tests__/lifecycle-manager.test.ts
++++ b/packages/core/src/__tests__/lifecycle-manager.test.ts
+@@ -604,7 +604,7 @@ describe("reactions", () => {
+     expect(notifier.notify).not.toHaveBeenCalled();
+   });
+ 
+-  it("dispatches unresolved review comments even when reviewDecision stays unchanged", async () => {
++  it("dispatches unresolved review comments with concrete comment context", async () => {
+     config.reactions = {
+       "changes-requested": {
+         auto: true,
+@@ -643,7 +643,10 @@ describe("reactions", () => {
+ 
+     await lm.check("app-1");
+     expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-    expect(mockSessionManager.send).toHaveBeenCalledWith("app-1", "Handle review comments.");
++    const sentMessage = vi.mocked(mockSessionManager.send).mock.calls[0]![1];
++    expect(sentMessage).toContain("Please rename this helper");
++    expect(sentMessage).toContain("src/app.ts:12");
++    expect(sentMessage).toContain("https://example.com/comment/1");
+ 
+     vi.mocked(mockSessionManager.send).mockClear();
+     await lm.check("app-1");
+@@ -653,7 +656,7 @@ describe("reactions", () => {
+     expect(metadata?.["lastPendingReviewDispatchHash"]).toBe("c1");
+   });
+ 
+-  it("does not double-send when changes_requested transition already triggered the reaction", async () => {
++  it("sends review context immediately after a changes_requested transition", async () => {
+     config.reactions = {
+       "changes-requested": {
+         auto: true,
+@@ -691,14 +694,25 @@ describe("reactions", () => {
+       registry,
+     });
+ 
+-    await lm.check("app-1");
+     await lm.check("app-1");
+ 
+-    expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-    expect(mockSessionManager.send).toHaveBeenCalledWith("app-1", "Handle requested changes.");
++    expect(mockSessionManager.send).toHaveBeenCalledTimes(2);
++    expect(mockSessionManager.send).toHaveBeenNthCalledWith(
++      1,
++      "app-1",
++      "Handle requested changes.",
++    );
++    const sentMessage = vi.mocked(mockSessionManager.send).mock.calls[1]![1];
++    expect(sentMessage).toContain("Please add validation");
++    expect(sentMessage).toContain("src/route.ts:44");
++    expect(sentMessage).toContain("https://example.com/comment/2");
++
++    vi.mocked(mockSessionManager.send).mockClear();
++    await lm.check("app-1");
++    expect(mockSessionManager.send).not.toHaveBeenCalled();
+   });
+ 
+-  it("dispatches automated review comments only once for an unchanged backlog", async () => {
++  it("dispatches automated review comments with the finding context", async () => {
+     config.reactions = {
+       "bugbot-comments": {
+         auto: true,
+@@ -737,10 +751,11 @@ describe("reactions", () => {
+ 
+     await lm.check("app-1");
+     expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-    expect(mockSessionManager.send).toHaveBeenCalledWith(
+-      "app-1",
+-      "Handle automated review findings.",
+-    );
++    const sentMessage = vi.mocked(mockSessionManager.send).mock.calls[0]![1];
++    expect(sentMessage).toContain("Potential issue detected");
++    expect(sentMessage).toContain("cursor[bot]");
++    expect(sentMessage).toContain("src/worker.ts:9");
++    expect(sentMessage).toContain("https://example.com/comment/3");
+ 
+     vi.mocked(mockSessionManager.send).mockClear();
+     await lm.check("app-1");
+@@ -750,7 +765,7 @@ describe("reactions", () => {
+     expect(metadata?.["lastAutomatedReviewDispatchHash"]).toBe("bot-1");
+   });
+ 
+-  it("dispatches CI failure details with check names and URLs on subsequent polls", async () => {
++  it("dispatches CI failure details with check names and URLs on first detection", async () => {
+     config.reactions = {
+       "ci-failed": {
+         auto: true,
+@@ -797,24 +812,24 @@ describe("reactions", () => {
+       registry,
+     });
+ 
+-    // First check: transition to ci_failed — sends the reaction message
++    // First check: transition to ci_failed — sends the reaction message plus detailed failures
+     await lm.check("app-1");
+     expect(lm.getStates().get("app-1")).toBe("ci_failed");
+-    expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-    expect(mockSessionManager.send).toHaveBeenCalledWith("app-1", "CI is failing. Fix it.");
+-
+-    vi.mocked(mockSessionManager.send).mockClear();
+-
+-    // Second check: still ci_failed, same failures — dispatches detailed CI info
+-    await lm.check("app-1");
+-    expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-    const sentMessage = vi.mocked(mockSessionManager.send).mock.calls[0]![1];
++    expect(mockSessionManager.send).toHaveBeenCalledTimes(2);
++    expect(mockSessionManager.send).toHaveBeenNthCalledWith(1, "app-1", "CI is failing. Fix it.");
++    const sentMessage = vi.mocked(mockSessionManager.send).mock.calls[1]![1];
+     expect(sentMessage).toContain("lint");
+     expect(sentMessage).toContain("typecheck");
+     expect(sentMessage).toContain("https://github.com/org/repo/actions/runs/123");
+     expect(sentMessage).toContain("https://github.com/org/repo/actions/runs/125");
+     // Should NOT include the passing check
+     expect(sentMessage).not.toContain("runs/124");
++
++    vi.mocked(mockSessionManager.send).mockClear();
++
++    // Second check: same failures — should not re-dispatch
++    await lm.check("app-1");
++    expect(mockSessionManager.send).not.toHaveBeenCalled();
+   });
+ 
+   it("does not re-dispatch CI failure details when failure set is unchanged", async () => {
+@@ -847,19 +862,13 @@ describe("reactions", () => {
+       registry,
+     });
+ 
+-    // First check: transition reaction
+-    await lm.check("app-1");
+-    expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
+-
+-    vi.mocked(mockSessionManager.send).mockClear();
+-
+-    // Second check: dispatches CI details
++    // First check: transition reaction + detailed CI dispatch
+     await lm.check("app-1");
+-    expect(mockSessionManager.send).toHaveBeenCalledTimes(1);
++    expect(mockSessionManager.send).toHaveBeenCalledTimes(2);
+ 
+     vi.mocked(mockSessionManager.send).mockClear();
+ 
+-    // Third check: same failures — should NOT dispatch again
++    // Second check: same failures — should not dispatch again
+     await lm.check("app-1");
+     expect(mockSessionManager.send).not.toHaveBeenCalled();
+ 
+@@ -898,13 +907,11 @@ describe("reactions", () => {
+       registry,
+     });
+ 
+-    // First check: transition + second poll to dispatch details
+-    await lm.check("app-1");
+-    vi.mocked(mockSessionManager.send).mockClear();
++    // First check: transition + detailed dispatch
+     await lm.check("app-1");
+     vi.mocked(mockSessionManager.send).mockClear();
+ 
+-    // Third check: same failures — no dispatch
++    // Second check: same failures — no dispatch
+     await lm.check("app-1");
+     expect(mockSessionManager.send).not.toHaveBeenCalled();
+ 
+@@ -1054,15 +1061,15 @@ describe("reactions", () => {
+       configOverride: configWithNotify,
+     });
+ 
+-    // First check: transition — notifier called for reaction
++    // First check: transition + detailed CI notification
+     await lm.check("app-1");
+-    expect(notifier.notify).toHaveBeenCalled();
++    expect(notifier.notify).toHaveBeenCalledTimes(2);
+ 
+     vi.mocked(notifier.notify).mockClear();
+ 
+-    // Second check: CI detail dispatch via notify action
++    // Second check: same failures — no new notification
+     await lm.check("app-1");
+-    expect(notifier.notify).toHaveBeenCalled();
++    expect(notifier.notify).not.toHaveBeenCalled();
+     expect(mockSessionManager.send).not.toHaveBeenCalled();
+   });
+ 
+@@ -1726,14 +1733,9 @@ describe("rate limiting optimizations", () => {
+ 
+     const lm = createLifecycleManager({ config, registry, sessionManager: mockSessionManager });
+     lm.start(60_000);
+-    // First poll: transitions to ci_failed, sends reaction message
++    // First poll: transitions to ci_failed and sends detailed failure context
+     await vi.advanceTimersByTimeAsync(0);
+ 
+-    vi.mocked(mockSessionManager.send).mockClear();
+-
+-    // Second poll: dispatches detailed CI failure info
+-    await vi.advanceTimersByTimeAsync(60_000);
+-
+     // getCIChecks() should NOT be called — batch enrichment has ciChecks
+     expect(getCIChecksMock).not.toHaveBeenCalled();
+     // Detailed message with lint check name/URL should be sent
+diff --git a/packages/core/src/config.ts b/packages/core/src/config.ts
+index 41bf358b..0c404e23 100644
+--- a/packages/core/src/config.ts
++++ b/packages/core/src/config.ts
+@@ -549,13 +549,15 @@ function applyDefaultReactions(config: OrchestratorConfig): OrchestratorConfig {
+       action: "send-to-agent",
+       message:
+         "There are review comments on your PR. Check with `gh pr view --comments` and `gh api` for inline comments. Address each one, push fixes, and reply.",
+-      escalateAfter: "30m",
++      retries: 2,
++      escalateAfter: 2,
+     },
+     "bugbot-comments": {
+       auto: true,
+       action: "send-to-agent",
+       message: "Automated review comments found on your PR. Fix the issues flagged by the bot.",
+-      escalateAfter: "30m",
++      retries: 2,
++      escalateAfter: 2,
+     },
+     "merge-conflicts": {
+       auto: true,
+diff --git a/packages/core/src/lifecycle-manager.ts b/packages/core/src/lifecycle-manager.ts
+index 613d8615..8c66b838 100644
+--- a/packages/core/src/lifecycle-manager.ts
++++ b/packages/core/src/lifecycle-manager.ts
+@@ -35,6 +35,8 @@ import {
+   type ProjectConfig as _ProjectConfig,
+   type PREnrichmentData,
+   type CICheck,
++  type ReviewComment,
++  type AutomatedComment,
+ } from "./types.js";
+ import { updateMetadata } from "./metadata.js";
+ import { getSessionsDir } from "./paths.js";
+@@ -572,6 +574,7 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+     projectId: string,
+     reactionKey: string,
+     reactionConfig: ReactionConfig,
++    messageOverride?: string,
+   ): Promise<ReactionResult> {
+     const trackerKey = `${sessionId}:${reactionKey}`;
+     let tracker = reactionTrackers.get(trackerKey);
+@@ -626,15 +629,16 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+ 
+     switch (action) {
+       case "send-to-agent": {
+-        if (reactionConfig.message) {
++        const message = messageOverride ?? reactionConfig.message;
++        if (message) {
+           try {
+-            await sessionManager.send(sessionId, reactionConfig.message);
++            await sessionManager.send(sessionId, message);
+ 
+             return {
+               reactionType: reactionKey,
+               success: true,
+               action: "send-to-agent",
+-              message: reactionConfig.message,
++              message,
+               escalated: false,
+             };
+           } catch {
+@@ -835,10 +839,34 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+         transitionReaction.result?.success
+       ) {
+         if (lastPendingDispatchHash !== pendingFingerprint) {
+-          updateSessionMetadata(session, {
+-            lastPendingReviewDispatchHash: pendingFingerprint,
+-            lastPendingReviewDispatchAt: new Date().toISOString(),
+-          });
++          const reactionConfig = getReactionConfigForSession(session, humanReactionKey);
++          if (
++            reactionConfig &&
++            reactionConfig.action &&
++            (reactionConfig.auto !== false || reactionConfig.action === "notify")
++          ) {
++            const detailedMessage = formatReviewBacklogMessage(pendingComments);
++            try {
++              if (reactionConfig.action === "send-to-agent") {
++                await sessionManager.send(session.id, detailedMessage);
++              } else {
++                const event = createEvent("review.comments_unresolved", {
++                  sessionId: session.id,
++                  projectId: session.projectId,
++                  message: detailedMessage,
++                  data: { commentCount: pendingComments.length },
++                });
++                await notifyHuman(event, reactionConfig.priority ?? "warning");
++              }
++
++              updateSessionMetadata(session, {
++                lastPendingReviewDispatchHash: pendingFingerprint,
++                lastPendingReviewDispatchAt: new Date().toISOString(),
++              });
++            } catch {
++              // Send failed — will retry next poll cycle
++            }
++          }
+         }
+       } else if (
+         !(oldStatus !== newStatus && newStatus === "changes_requested") &&
+@@ -855,6 +883,7 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+             session.projectId,
+             humanReactionKey,
+             reactionConfig,
++            formatReviewBacklogMessage(pendingComments),
+           );
+           if (result.success) {
+             updateSessionMetadata(session, {
+@@ -896,11 +925,13 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+           reactionConfig.action &&
+           (reactionConfig.auto !== false || reactionConfig.action === "notify")
+         ) {
++          const detailedMessage = formatAutomatedReviewMessage(automatedComments);
+           const result = await executeReaction(
+             session.id,
+             session.projectId,
+             automatedReactionKey,
+             reactionConfig,
++            detailedMessage,
+           );
+           if (result.success) {
+             updateSessionMetadata(session, {
+@@ -934,6 +965,53 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+     return lines.join("\n");
+   }
+ 
++  function normalizeFeedbackBody(body: string): string {
++    return body.replace(/\s+/g, " ").trim();
++  }
++
++  function formatReviewLocation(path?: string, line?: number): string {
++    if (!path) return "general review";
++    return typeof line === "number" ? `${path}:${line}` : path;
++  }
++
++  function formatReviewBacklogMessage(comments: ReviewComment[]): string {
++    const countLabel =
++      comments.length === 1 ? "1 unresolved review comment" : `${comments.length} unresolved review comments`;
++    const lines = [
++      `There ${comments.length === 1 ? "is" : "are"} ${countLabel} on your PR. Address each one, push fixes, and reply in GitHub.`,
++      "",
++    ];
++
++    for (const comment of comments) {
++      lines.push(`- ${comment.author} on ${formatReviewLocation(comment.path, comment.line)}`);
++      lines.push(`  ${normalizeFeedbackBody(comment.body)}`);
++      lines.push(`  ${comment.url}`);
++    }
++
++    lines.push("", "After fixing, resolve or reply to the review threads on the PR.");
++    return lines.join("\n");
++  }
++
++  function formatAutomatedReviewMessage(comments: AutomatedComment[]): string {
++    const countLabel =
++      comments.length === 1 ? "1 automated review finding" : `${comments.length} automated review findings`;
++    const lines = [
++      `There ${comments.length === 1 ? "is" : "are"} ${countLabel} on your PR. Fix each finding, push updates, and re-run the failing checks.`,
++      "",
++    ];
++
++    for (const comment of comments) {
++      lines.push(
++        `- [${comment.severity}] ${comment.botName} on ${formatReviewLocation(comment.path, comment.line)}`,
++      );
++      lines.push(`  ${normalizeFeedbackBody(comment.body)}`);
++      lines.push(`  ${comment.url}`);
++    }
++
++    lines.push("", "After fixing the findings, reply on the PR if the bot or reviewer expects follow-up.");
++    return lines.join("\n");
++  }
++
+   /**
+    * Dispatch CI failure details to the agent session when new or changed
+    * failures are detected. Follows the same fingerprinting/deduplication
+@@ -1018,16 +1096,6 @@ export function createLifecycleManager(deps: LifecycleManagerDeps): LifecycleMan
+       });
+     }
+ 
+-    // If transition already sent a ci-failed reaction with the static message,
+-    // skip this cycle but do NOT record dispatch hash — the next poll will send
+-    // the detailed CI failure info with check names and URLs.
+-    if (
+-      transitionReaction?.key === ciReactionKey &&
+-      transitionReaction.result?.success
+-    ) {
+-      return;
+-    }
+-
+     // Skip if we already dispatched this exact failure set
+     if (ciFingerprint === lastCIDispatchHash) return;
+ 
