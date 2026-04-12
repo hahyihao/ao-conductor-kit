@@ -571,6 +571,21 @@ git branch --list 'feat/*' | xargs -r git branch -D
 
 完成之后再 `ao spawn` 或 `ao batch-spawn` 就不会再因为重复 checkout 失败。
 
+如果冲突发生在 slot lifecycle 恢复阶段，处理方式要更保守一些。slot lane 的恢复只需要清掉陈旧的 orchestrator worktree，不应该把还活着的 worker worktree 一起删掉。正确的清理范围是：
+
+```bash
+# 只清理 slot orchestrator 的陈旧 worktree
+rm -rf /root/.worktrees/ao-kit-slot-1/kit1-orchestrator-*
+rm -rf /root/.worktrees/ao-kit-slot-2/kit2-orchestrator-*
+rm -rf /root/.worktrees/ao-kit-slot-3/kit3-orchestrator-*
+rm -rf /root/.worktrees/ao-kit-slot-4/kit4-orchestrator-*
+
+# 然后让 git 丢掉失效登记
+git worktree prune
+```
+
+仓库里的 `tools/start-slot-lifecycle-workers.sh` 现在会在尝试恢复 slot lifecycle 之前先做这一步，并且只删除没有健康 session 的 `kitN-orchestrator-*` 目录。这样即使之前的 `ao session kill` 留下了占坑的 orchestrator worktree，slot 恢复也不会再因为 `already exists` / `already checked out` 直接失败。
+
 ### 预防
 
 1. 不要连续 `ao session kill` 之后立即 `ao spawn` 同一个 issue，至少先跑一次上面的清理流程。
