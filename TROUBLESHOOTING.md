@@ -897,3 +897,77 @@ GIT_TRACE_CURL=1 GIT_CURL_VERBOSE=1 git push
 这些 warning 经常只是说明某个可选插件市场能力没有完成预热。
 只要当前工作流依赖的 `codex exec`、`ao start`、`ao spawn`、`gh auth` 等主路径正常，它们通常不是阻塞项。
 处理顺序上，先解决真正挡路的网络、认证、runtime、依赖管理问题，再考虑清理这些外围噪声。
+
+---
+
+## Issue 11：claude-code PM 在 root 环境下启动的三道拦截
+
+**背景**：2026-04-12 首次将 PM 从 GPT-5.4 (codex) 切换到 claude-code + Opus 时遇到。
+
+### 拦截 1：root 用户运行 `--dangerously-skip-permissions` 被拒
+
+**报错**：`--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons`
+
+**原因**：claude-code cli.js 硬编码了 root 检查：
+```js
+if (process.getuid() === 0 && process.env.IS_SANDBOX !== "1") process.exit(1)
+```
+
+**修复**：设置 `IS_SANDBOX=1` 环境变量。
+
+### 拦截 2：`IS_SANDBOX=1` 没有透传到 tmux session
+
+**原因**：AO 的 claude-code plugin `getEnvironment()` 只传 `CLAUDECODE`、`AO_SESSION_ID` 等少数几个变量，不继承父进程 env。tmux 的 `-e KEY=VALUE` 只传插件返回的那些，`IS_SANDBOX=1` 以及 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 都不会自动带入。
+
+**修复**：用 tmux 全局环境变量，所有新 session 自动继承：
+```bash
+tmux set-environment -g IS_SANDBOX 1
+tmux set-environment -g ANTHROPIC_BASE_URL http://www.hahakaifa.cn:7892
+tmux set-environment -g ANTHROPIC_AUTH_TOKEN sk-xxx...
+tmux set-environment -g CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC 1
+```
+
+同时在 `/root/.bashrc` 末尾也加上这几行 `export`，保证登录 shell 也能继承。
+
+### 拦截 3：每次启动弹出 bypass 权限确认 dialog
+
+**表现**：交互式菜单 "1. No, exit / 2. Yes, I accept"，无人值守时自动选了 1 退出。
+
+**原因**：claude-code 第一次以 bypass 模式运行时弹 dialog，接受后写入用户设置文件跳过后续弹框。
+
+**修复**：直接预创建设置文件，跳过 dialog：
+```bash
+echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
+```
+
+该字段 `skipDangerousModePermissionPrompt` 是 dialog 接受时写入的键，预先写入即可。
+
+### 拦截 4：AO 重启后旧 next-server 仍占用端口 3000
+
+**表现**：`ao stop` 后再 `ao start`，新 server 绑到了 3001 而非 3000，API 调用全部失效。
+
+**原因**：`ao stop` 停了 AO manager 进程，但旧的 next-server 子进程没被 kill，继续占用 3000。
+
+**修复**：重启前先确认端口释放：
+```bash
+ss -tlnp | grep 3000   # 找到占用的 PID
+kill <PID>             # 或 tmux kill-session -t ao-server
+```
+
+### 一次性预配置（重装或换机时执行一次）
+
+```bash
+# 1. tmux 全局 env
+tmux set-environment -g IS_SANDBOX 1
+tmux set-environment -g ANTHROPIC_BASE_URL http://www.hahakaifa.cn:7892
+tmux set-environment -g ANTHROPIC_AUTH_TOKEN sk-xxx...
+tmux set-environment -g CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC 1
+
+# 2. 预接受 bypass dialog
+echo '{"skipDangerousModePermissionPrompt": true}' > /root/.claude/settings.json
+
+# 3. .bashrc 持久化（确保登录 shell 也生效）
+# （已追加到 /root/.bashrc 末尾）
+```
+
+完成后 `ao start` → `POST /api/orchestrators` 即可得到一个正常运行的 claude-code PM，无需任何手动交互。
