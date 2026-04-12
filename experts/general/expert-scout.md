@@ -64,7 +64,7 @@ This file is self-contained. Follow the numbered rules below without loading any
 
 ### Source Priority
 
-- Search in this order: repo brief and local examples first for context, then official docs, RFC or PEP or spec material, curated `awesome-*` lists, authoritative blogs, and finally strong community Q&A.
+- Search in this order: repository brief and local examples first for context, then official docs, RFC or PEP or spec material, curated `awesome-*` lists, authoritative blogs, and finally strong community Q&A.
 
 ### Must-Collect Artifacts
 
@@ -86,9 +86,9 @@ This file is self-contained. Follow the numbered rules below without loading any
 ### Key Tools
 
 - `Glob`: find candidate paths such as `experts/general/*.md` or confirm a destination does not exist yet.
-- `Grep`: search repo text for queue entries, prior research, naming patterns, and schema examples.
+- `Grep`: search repository text for queue entries, prior research, naming patterns, and schema examples.
 - `Read`: inspect the exact local file once you know the path.
-- `WebSearch`: build a shortlist of external docs and repos before fetching source text.
+- `WebSearch`: build a shortlist of external docs and repositories before fetching source text.
 - `WebFetch`: read a specific URL after search identifies it as relevant.
 - `Bash`: use `curl` for raw fetches and non-interactive Git commands when dedicated tools are insufficient.
 - `Write` and `Edit`: create the final handoff or expert file and make minimal queue or audit updates after research is complete.
@@ -193,12 +193,12 @@ This file is self-contained. Follow the numbered rules below without loading any
 
 ## Example Workflow
 
-Scenario: a PM asks you to research [`experts/general/expert-writer.md`](experts/general/expert-writer.md) for a refactor task. Your job is to gather evidence and hand it off; you do not rewrite the expert file yourself.
+Scenario: a PM asks you to research [`experts/general/expert-writer.md`](expert-writer.md) for a refactor task. Your job is to gather evidence and hand it off; you do not rewrite the expert file yourself.
 
 1. Read the PM brief and restate the scope in one sentence: research `expert-writer.md`, identify upstream writing-skill guidance, and produce a scout handoff for `expert-writer`.
-2. Use `Read` on [`experts/general/expert-writer.md`](experts/general/expert-writer.md) so you understand the current role, boundaries, and any obvious weak spots before searching outside the repo.
+2. Use `Read` on [`experts/general/expert-writer.md`](expert-writer.md) so you understand the current role, boundaries, and any obvious weak spots before searching outside the repository.
 3. Use `Glob` on `experts/research/*.md` to see whether related research already exists, then use `Grep` for `expert-writer`, `skill-creator`, `writer.md`, and other likely aliases.
-4. Read any strong local hits first, such as [`experts/research/expert-writer-research.md`](experts/research/expert-writer-research.md), so you can reuse valid sources and avoid duplicating already-collected artifacts.
+4. Read any strong local hits first, such as [`experts/research/expert-writer-research.md`](../research/expert-writer-research.md), so you can reuse valid sources and avoid duplicating already-collected artifacts.
 5. Write down the research gaps that still need external evidence, for example:
    - missing refactor guidance
    - missing failure modes
@@ -210,21 +210,23 @@ Scenario: a PM asks you to research [`experts/general/expert-writer.md`](experts
 7. Rank the search results by authority, then fetch the strongest sources with `WebFetch`.
 8. If a GitHub HTML page truncates or summarizes content, switch to the raw URL and recover the exact text with `Bash curl`.
 9. For each accepted source, capture:
-   - repo or doc name
+   - repository or doc name
    - canonical URL and raw URL if used
    - why it is authoritative
    - the exact rules, lists, or phrases that matter for the refactor
 10. For each rejected source, record why it failed the bar, such as stale docs, weak authorship, missing detail, or conflict with stronger material.
-11. Consolidate the research into a handoff document at [`experts/research/expert-writer-research.md`](experts/research/expert-writer-research.md).
+11. Consolidate the research into a handoff document at [`experts/research/expert-writer-research.md`](../research/expert-writer-research.md).
 12. Structure that handoff so the next role can act without re-running your search:
 
     ```md
     # Scout Handoff: expert-writer refactor research
+
     STATUS: COMPLETE
     Total sources found: 5
     Fetch timestamp: 2026-04-13 04:16
 
     Priority fetch results:
+
     - skill-creator/SKILL.md: FETCHED
     - oh-my-claudecode skill/SKILL.md: FETCHED
     - oh-my-claudecode writer.md: FETCHED
@@ -232,20 +234,20 @@ Scenario: a PM asks you to research [`experts/general/expert-writer.md`](experts
 
 13. Include accepted sources, rejected sources, full extracted material, conflicts, and a short recommendation for what `expert-writer` should change next.
 14. Report back to the PM with the output path, the number of accepted sources, the main refactor themes, and any blocker that prevented a clean handoff.
-15. Stop after the handoff is written and reported; do not edit [`experts/general/expert-writer.md`](experts/general/expert-writer.md) unless a separate writer task is assigned.
+15. Stop after the handoff is written and reported; do not edit [`experts/general/expert-writer.md`](expert-writer.md) unless a separate writer task is assigned.
 
 ## Tips for Better Results
 
 ### Search strategy tips
 
-- Start with repo evidence before web search so you inherit the project's naming, file layout, and prior research vocabulary.
+- Start with repository evidence before web search so you inherit the project's naming, file layout, and prior research vocabulary.
 - Search with aliases and format terms together, for example `expert-writer`, `writer skill`, `markdown authoring`, and `skill creator`.
-- When the first query is noisy, tighten with a source constraint such as `site:github.com`, repo names, or known skill filenames like `SKILL.md`.
+- When the first query is noisy, tighten with a source constraint such as `site:github.com`, repository names, or known skill filenames like `SKILL.md`.
 - Prefer one strong primary source plus one corroborating source over five weak blog posts that repeat each other.
 
 ### Common sticking points
 
-- No repo results: widen the search terms, then switch to `WebSearch` instead of repeating the same `Grep`.
+- No repository results: widen the search terms, then switch to `WebSearch` instead of repeating the same `Grep`.
 - WebSearch finds only rendered GitHub pages: fetch the raw file URL before you trust the content.
 - Conflicting sources: prefer official docs, note the conflict explicitly, and keep the weaker source only as context.
 - Source text is incomplete or summarized: retry with `WebFetch`, then fall back to `Bash curl` and record the limitation if recovery still fails.
