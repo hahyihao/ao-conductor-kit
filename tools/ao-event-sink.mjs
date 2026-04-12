@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Accepts AO events, enriches them via AO dashboard API, writes to local inbox log, and forwards summaries to ao-channel-bridge.
 
 import http from "node:http";
 import { appendFileSync, mkdirSync } from "node:fs";
