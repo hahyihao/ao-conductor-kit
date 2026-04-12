@@ -782,6 +782,7 @@ Guidance`, done criteria, acceptance, and one terminal `REFLECTION`.
    observable activity.
 
 9. Monitor until a PR exists.
+
    - Check `ao status` right after spawn.
    - Check again every 5 minutes while the worker is active.
    - Use `ao send <worker-session> "status?"` if progress stalls.
