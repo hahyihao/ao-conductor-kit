@@ -4,6 +4,8 @@ description: 当用户说“派活”“并行开发”“同时写”“批量�
 type: skill
 ---
 
+# AO Conductor
+
 你是 CEO/PM/Worker 模型里的 CEO。
 这个 skill 的目标不是让你把所有事都亲手做完，
 而是让你先判断是否值得调度，
@@ -100,8 +102,19 @@ ao batch-spawn
 你应该先说：“我选择 Mode C，因为这是 3 个目标文件、3 个可独立交付的文档任务，彼此依赖低，适合并行 dispatch。我会先检查 WSL、AO、Codex、项目配置和 orchestrator 状态，再写自包含 briefs。”
 
 示例对话二：
-用户说：“fix this one typo in README.”
+用户说：“fix this one typo in readme.”
 你应该先说：“我选择 Mode A，因为这是单文件、单点改动，预计 15 分钟内完成。这个任务不值得 dispatch，我会直接修改。”
+
+### 2.3 状态巡检与自愈摘要
+
+dispatch 之后必须做 state-check，而不是把“message sent”当成功。
+最低要求如下，完整协议见 `references/silent-failure-detection.md`：
+
+- 每次 `ao send` / `ao batch-spawn` 后约 10 秒复核一次；先看 dashboard，再用 `ao status` / GitHub 交叉核对
+- 必须区分 present signal 和 past signal；`Worked for ...` 只代表上一个 turn 结束，不代表仍在进行
+- dashboard 可见状态是权威；tmux、pstree、raw API 只能用于诊断，不能作为“其实已经在跑”的证据
+- 若 dispatch 未被验证成功，就立刻 self-heal：补发、补 Enter、重新验证；只有在真实错误、真实交付或需要新决策时才向用户升级
+- zero-backlog 仍然成立；允许推进下一个已显式存在的 canonical item，但禁止靠隐藏 backlog、memo、cache 或 state file 继续派活
 
 ## 3. Mode C 的 brief 编写协议
 
@@ -134,23 +147,28 @@ Purpose:
 用一句话说明这个子任务解决什么问题。
 
 Expected structure:
+
 - Section A
 - Section B
 - Section C
 
 Required facts:
+
 - URL:
 - Version:
 - Commands:
 - Config:
 
 Do:
+
 - ...
 
 Don't:
+
 - ...
 
 Output constraints:
+
 - Only create or modify:
 - Do not modify:
 - Commit message:
@@ -279,11 +297,11 @@ gh pr diff <pr-number>
 - 用户说“fix this one typo”。这是 Mode A，直接改，不要建 issue。
 - 用户说“explain what this function does”。这是解释任务，直接解释，不要开 worker。
 - 用户正在互动式调试。比如一边看日志一边追问题，AO 会打断节奏。
-- 当前目录不是 git repo。AO 依赖 git 工作流，没有仓库就不该进入派活流程。
+- 当前目录不是 Git repo。AO 依赖 Git 工作流，没有仓库就不该进入派活流程。
 - 仓库没有配置 GitHub remote。`gh` 和 `batch-spawn` 都依赖明确的远程仓库上下文。
 
 当你拒绝 dispatch 时，不要只说“不用这个 skill”。
-你要给用户一个替代动作，比如直接修、直接解释、或者先初始化 git、remote、`agent-orchestrator.yaml` 再继续。
+你要给用户一个替代动作，比如直接修、直接解释、或者先初始化 Git、remote、`agent-orchestrator.yaml` 再继续。
 
 示例对话四：
 用户说：“解释一下这个函数干嘛的。”

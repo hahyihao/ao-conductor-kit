@@ -9,7 +9,7 @@ cd "$REPO"
 echo "=== fetch origin ==="
 HTTPS_PROXY=http://172.17.224.1:7897 git fetch origin --prune 2>&1 | tail -3
 
-mkdir -p "$MOTHER/scripts" "$MOTHER/skills" "$MOTHER/.github/workflows"
+mkdir -p "$MOTHER/scripts" "$MOTHER/skills/references" "$MOTHER/.github/workflows"
 
 echo "=== extract worker files ==="
 git show "origin/feat/9:scripts/bootstrap-wsl2.ps1"  > "$MOTHER/scripts/bootstrap-wsl2.ps1"
@@ -17,7 +17,9 @@ git show "origin/feat/10:scripts/bootstrap-ao.sh"    > "$MOTHER/scripts/bootstra
 git show "origin/feat/11:INSTALL.md"                  > "$MOTHER/INSTALL.md"
 git show "origin/feat/12:FLOW.md"                     > "$MOTHER/FLOW.md"
 git show "origin/feat/13:TROUBLESHOOTING.md"          > "$MOTHER/TROUBLESHOOTING.md"
-git show "origin/feat/14:skills/ao-conductor.md"      > "$MOTHER/skills/ao-conductor.md"
+git show "HEAD:skills/ao-conductor.md"                > "$MOTHER/skills/ao-conductor.md"
+git show "HEAD:skills/references/silent-failure-detection.md" \
+                                                      > "$MOTHER/skills/references/silent-failure-detection.md"
 
 echo "=== copy CI files ==="
 cp "$MOTHER/ci-staging/super-linter.yml"      "$MOTHER/.github/workflows/super-linter.yml"
@@ -37,4 +39,5 @@ find . -type f \
 
 echo
 echo "=== sizes ==="
-du -h scripts/bootstrap-wsl2.ps1 scripts/bootstrap-ao.sh INSTALL.md FLOW.md TROUBLESHOOTING.md skills/ao-conductor.md .github/workflows/*.yml
+du -h scripts/bootstrap-wsl2.ps1 scripts/bootstrap-ao.sh INSTALL.md FLOW.md TROUBLESHOOTING.md \
+  skills/ao-conductor.md skills/references/silent-failure-detection.md .github/workflows/*.yml

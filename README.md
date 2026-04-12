@@ -87,9 +87,11 @@ ao start
 
 ```bash
 # WSL 或 Git Bash
-mkdir -p ~/.claude/skills/ao-conductor
+mkdir -p ~/.claude/skills/ao-conductor/references
 cp /mnt/d/脚本程序/agent-orchestrator/skills/ao-conductor.md \
    ~/.claude/skills/ao-conductor/SKILL.md
+cp /mnt/d/脚本程序/agent-orchestrator/skills/references/silent-failure-detection.md \
+   ~/.claude/skills/ao-conductor/references/silent-failure-detection.md
 ```
 
 之后任何 Claude Code 会话里，当你说"派活"、"并行开发"、"ao batch"等关键词，Claude 会自动切换到总经理模式。
@@ -111,7 +113,10 @@ agent-orchestrator/
 │   └── bootstrap-ao.sh             ← WSL 内 AO 工具链一键装
 │
 ├── skills/
-│   └── ao-conductor.md             ← Claude 总经理技能源（拷到 ~/.claude/skills/）
+│   ├── ao-conductor.md             ← Claude 总经理技能源（拷到 ~/.claude/skills/ao-conductor/SKILL.md）
+│   └── references/
+│       └── silent-failure-detection.md
+│                                  ← state-check protocol，安装时与 SKILL.md 一起分发
 │
 ├── templates/
 │   ├── agent-orchestrator.yaml     ← 新项目 AO 配置模板
