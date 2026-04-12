@@ -2,7 +2,7 @@
 
 This file is maintained automatically by `library-maintainer`. Do not edit by hand.
 
-Last updated: 2026-04-12 (Round 2.5 general library sync)
+Last updated: 2026-04-12 (Issue #138 ecosystem-monitor admission)
 
 ## General experts
 
@@ -13,6 +13,7 @@ Last updated: 2026-04-12 (Round 2.5 general library sync)
 | code-writer        | general | oh-my-claudecode:executor                                                   | active |
 | debugger           | general | oh-my-claudecode:debugger + tracer                                          | active |
 | env-ops            | general | oh-my-claudecode:git-master                                                 | active |
+| ecosystem-monitor  | general | oh-my-claudecode:document-specialist + external-context + tech-scout        | active |
 | expert-scout       | general | oh-my-claudecode:document-specialist + external-context + tech-scout        | active |
 | expert-writer      | general | oh-my-claudecode:skill + oh-my-claudecode:skillify                          | active |
 | library-maintainer | general | oh-my-claudecode:verifier + oh-my-claudecode:simplify                       | active |
@@ -40,7 +41,7 @@ Empty. Auto-populated by expert-scout on demand.
 
 ## Stats
 
-- Total experts: 17
-- Active: 17
+- Total experts: 18
+- Active: 18
 - Archived: 0
 - Awaiting discovery: 0 (see `discovery-queue.md`)
