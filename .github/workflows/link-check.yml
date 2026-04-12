@@ -1,0 +1,67 @@
+name: Link Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify local markdown links and expert index drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check local markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          fail: true
+          failIfEmpty: false
+          args: >-
+            --offline
+            --no-progress
+            --root-dir "$(pwd)"
+            "./skills/**/*.md"
+            "./experts/**/*.md"
+
+      - name: Check experts index drift
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracked_file="$(mktemp)"
+          indexed_file="$(mktemp)"
+          trap 'rm -f "$tracked_file" "$indexed_file"' EXIT
+
+          git ls-files 'experts/general/*.md' \
+            | sed -e 's#^experts/general/##' -e 's#\.md$##' \
+            | sort >"$tracked_file"
+
+          awk '
+            /^## General experts$/ { in_general = 1; next }
+            /^## / && in_general { exit }
+            in_general && /^\|/ {
+              if ($0 ~ /^\| Name / || $0 ~ /^\| --/) {
+                next
+              }
+
+              name = $2
+              gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+
+              if (name != "") {
+                print name
+              }
+            }
+          ' experts/index.md | sort >"$indexed_file"
+
+          if ! diff -u \
+            --label 'experts/index.md general entries' "$indexed_file" \
+            --label 'tracked experts/general/*.md basenames' "$tracked_file"; then
+            echo "::error title=experts/index.md drift::General expert entries in experts/index.md do not match tracked files under experts/general/."
+            exit 1
+          fi
