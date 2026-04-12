@@ -91,7 +91,7 @@ quality feedback loop 负责判断是否还需要追加更深一层的防复发�
 
 - 同类问题跨多个 issue / PR / worker 重复出现
 - 不同 PM / worker 都做出“各自看起来合理”的不同决策
-- live doctrine 明明在执行，但 repo 里没有对应权威文本
+- live doctrine 明明在执行，但 repository 里没有对应权威文本
 - review 结论稳定依赖口头补充，而不是现有文档
 
 第四层回答的问题是：
@@ -123,7 +123,7 @@ quality feedback loop 的最小闭环固定为六步：
 - 同一类错误在 2 次或以上独立 issue / PR / session 中重复出现，且不是同一个人手滑
 - 当前 expert / reference / skill 缺少能直接阻断该错误的规则、检查项或模板
 - review comment 已经指出“这不是实现细节，而是指导文本缺口”
-- live 工作方式已经稳定存在，但 repo 内权威文档缺失或落后
+- live 工作方式已经稳定存在，但 repository 内权威文档缺失或落后
 - 多个 worker 按现有指令都做出了相似的错误输出，说明问题更像 prompt / doctrine drift，而不是个体执行失误
 - CEO 或 PM 需要反复手写同一段补充说明，才能让 worker 正常完成任务
 
@@ -157,41 +157,53 @@ Related files:
 Stage: brief | implementation | self-review | review | CI | post-merge
 
 Observed layer:
+
 - Result layer | Artifact layer | Process layer | Doctrine layer
 
 Symptom:
+
 - 这次具体出了什么问题
 
 User / delivery impact:
+
 - 影响了什么验收、质量或节奏
 
 Evidence:
+
 - 链接、命令输出摘要、review comment、CI 失败点、具体文件路径
 
 Expected behavior:
+
 - 按当前期望，本来应该发生什么
 
 Actual behavior:
+
 - 实际发生了什么
 
 Root-cause hypothesis:
+
 - 当前判断最深根因位于哪一层
 - 为什么不是更浅层、也为什么不是更深层
 
 Immediate containment:
+
 - 当前 PR / 当前 run 立刻要怎么止血
 
 Prevention patch target:
+
 - doctrine | expert file | CEO/PM process | worker process | artifact template
 
 Proposed patch:
+
 - 具体要新增、修改、或收紧什么规则 / 模板 / gate
 
 Owner:
 Due trigger:
+
 - 什么后续动作算这个事件真正关闭
 
 Validation on next run:
+
 - 下一次如何确认它真的减少复发
 ```
 
