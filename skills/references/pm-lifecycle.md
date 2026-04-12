@@ -21,7 +21,7 @@
 - CEO 负责 scope、优先级、lane 划分、PM 任命与 PM 替换裁决。
 - PM 负责单条 lane 的执行推进：拆分、派工、验收、跟进、汇报、去重。
 - worker 负责具体 issue / branch / PR 上的生产工作，不负责改写 lane ownership。
-- 一条 lane 的 canonical state 必须落在可观察载体上：repo 文件、brief、GitHub issue / PR / comment、AO dashboard、`ao status`、CI 状态。
+- 一条 lane 的 canonical state 必须落在可观察载体上：仓库文件、brief、GitHub issue / PR / comment、AO dashboard、`ao status`、CI 状态。
 - 任何 PM 交接都不能依赖私人 memo、脑内待办、剪贴板、tmux 暂存画面或“我记得之前做到哪了”。
 - 旧 PM 在未完成交接前不能把 lane 悄悄丢给新 PM；新 PM 在未完成 reconciliation 前不能假设自己已经理解全部上下文。
 
@@ -89,7 +89,7 @@
 - 当前 blocker、最后一个已完成动作、下一个明确动作
 
 快照必须来自可核对来源，而不是记忆。
-如果某条信息不能被 repo / GitHub / dashboard / `ao status` 证实，就标成 unknown，不要脑补。
+如果某条信息不能被仓库 / GitHub / dashboard / `ao status` 证实，就标成 unknown，不要脑补。
 
 ### Step 3. Assign the new PM and cut ownership
 
@@ -141,7 +141,7 @@ CEO 明确指定新 PM，并切清 ownership：
 
 跨电脑、跨 WSL、跨 shell、跨 session 的 PM 迁移，一律按 replacement 处理，不按“无缝继续”处理。
 
-- 新环境必须重新验证 AO、Git、GitHub、orchestrator、dashboard、repo 路径都可用。
+- 新环境必须重新验证 AO、Git、GitHub、orchestrator、dashboard、仓库路径都可用。
 - 不得假设旧机器上的 tmux pane、shell 历史、环境变量、代理、未提交终端状态还能继承。
 - 迁移的单位是 lane，不是“把所有正在做的事一起端过去”。
 - 优先复用已有 issue、branch、PR、brief；不要因为换机器就重建工单体系。
