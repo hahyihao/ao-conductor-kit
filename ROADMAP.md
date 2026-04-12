@@ -91,3 +91,30 @@ Total experts in library: 27
 5. ao status — check orchestrator health
 6. tmux -V >= 3.3 (if 3.2a, fix immediately per Issue 11)
 7. Resume from current round
+
+---
+
+## Handoff Snapshot — 2026-04-12 23:22 CST (+0800)
+
+### Pending tasks
+
+- Open PRs #1, #2, and #3 remain pending as dependabot bump follow-ups.
+- Open issue #149 remains in the tracker; its model routing A work appears to have landed via merged PRs, so this should be treated as follow-up/admin cleanup if it is still open at resume time.
+
+### Completed work summary
+
+- Round 2 experts merged (#22, #23, #24, #25, #26, #27, #28, #29).
+- Round 2.5 work merged (#84, #94, #104).
+- Round 3 project experts merged (#99, #100, #101, #102, #103, #105, #107, #108, #109, #111).
+- Stability PRs merged (#82, #89, #90, #91, #92).
+- Channel and callback work merged (#98, #152, #153, #157).
+- Model routing PRs merged (#154, #155, #156).
+- Round 4 ADR merged (#129).
+- Expert index, reference, and CI guardrail work merged (#113, #117, #121, #122, #125, #127).
+- Community improvements merged (#139, #140, #141, #142, #143, #144, #145).
+
+### Next-step plan
+
+- Verify and triage the remaining dependabot PRs (#1, #2, #3).
+- Clean tracking drift such as issue #149 if it is still open after its implementation PR merged.
+- Continue Round 4 implementation issue splitting from ADR #129 when the handoff resumes.
