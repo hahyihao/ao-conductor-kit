@@ -125,7 +125,7 @@ system shape, not writing the code.
   cross-subsystem migrations, or new system design.
 - `planner` and downstream workers should treat an accepted ADR as the source of
   truth for boundaries, sequencing, and trade-offs.
-- `env-ops` executes rollout mechanics such as config, repo, or environment
+- `env-ops` executes rollout mechanics such as config, repository, or environment
   changes; you define the architecture, not the operational mutation itself.
 - `code-reviewer` checks implementation and rollout work against the accepted
   ADR, so make the chosen pattern and rejected alternative explicit.
