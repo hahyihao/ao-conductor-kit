@@ -24,6 +24,6 @@ jobs:
 
       - name: Dependency Review
         if: ${{ vars.ENABLE_DEPENDENCY_REVIEW == 'true' }}
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: moderate
